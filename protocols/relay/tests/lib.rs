@@ -132,7 +132,7 @@ fn src_connect_to_dst_listening_via_relay() {
             // Destination Node waiting for Ping from Source Node via Relay.
             loop {
                 match dst_swarm.next_event().await {
-                    SwarmEvent::Behaviour(CombinedEvent::Ping(_)) => {}
+                    SwarmEvent::Behaviour(_) => {}
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
                         assert_eq!(peer_id, src_peer_id);
                         break;
@@ -140,45 +140,82 @@ fn src_connect_to_dst_listening_via_relay() {
                     e => panic!("{:?}", e),
                 }
             }
+            loop {
+                dst_swarm.next().await;
+            }
         };
 
-        src_swarm.dial_addr(dst_addr_via_relay).unwrap();
+        let (delay_tx, delay_rx) =  futures::channel::oneshot::channel();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(20));
+            delay_tx.send(()).unwrap();
+        });
+
+
         let src = async move {
-            // Source Node dialing Relay to connect to Destination Node.
-            match src_swarm.next_event().await {
-                SwarmEvent::Dialing(peer_id) if peer_id == relay_peer_id => {}
-                e => panic!("{:?}", e),
-            }
+        
+            let mut delay_rx = Some(delay_rx);
 
-            // Source Node establishing connection to Relay to connect to Destination Node.
-            match src_swarm.next_event().await {
-                SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == relay_peer_id => {}
-                e => panic!("{:?}", e),
-            }
+            for i in 0..2 { 
 
-            // Source Node establishing connection to destination node via Relay.
-            loop {
+                src_swarm.dial_addr(dst_addr_via_relay.clone()).unwrap();
+                // Source Node dialing Relay to connect to Destination Node.
                 match src_swarm.next_event().await {
-                    SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == dst_peer_id => {
-                        break
-                    }
-                    SwarmEvent::Behaviour(CombinedEvent::Ping(_)) => {}
-                    e => panic!("{:?}", e),
+                    SwarmEvent::Dialing(peer_id) if peer_id == relay_peer_id => {}
+                    e => panic!("[Iteration {}] {:?}", i, e),
                 }
-            }
 
-            // Source Node waiting for Ping from Destination Node via Relay.
-            loop {
+                // Source Node establishing connection to Relay to connect to Destination Node.
                 match src_swarm.next_event().await {
-                    SwarmEvent::Behaviour(CombinedEvent::Ping(PingEvent {
-                        peer,
-                        result: Ok(_),
-                    })) => {
-                        if peer == dst_peer_id {
-                            break;
+                    SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == relay_peer_id => {}
+                    e => panic!("[Iteration {}] {:?}", i, e),
+                }
+
+                // Source Node establishing connection to destination node via Relay.
+                loop {
+                    match src_swarm.next_event().await {
+                        SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == dst_peer_id => {
+                            break
+                        }
+                        SwarmEvent::Behaviour(CombinedEvent::Ping(_)) => {}
+                    e => panic!("[Iteration {}] {:?}", i, e),
+                    }
+                }
+
+                // Source Node waiting for Ping from Destination Node via Relay.
+                loop {
+                    match src_swarm.next_event().await {
+                        SwarmEvent::Behaviour(CombinedEvent::Ping(PingEvent {
+                            peer,
+                            result: Ok(_),
+                        })) => {
+                            if peer == dst_peer_id {
+                                break;
+                            }
+                        }
+                    e => panic!("[Iteration {}/2] {:?}", i+1, e),
+                    }
+                }
+                
+                if let Some(rx) = delay_rx.take() {
+                    // await 20s delay
+                    rx.await.unwrap();
+
+                    loop {
+                        match src_swarm.next_event().await {
+                            SwarmEvent::ConnectionClosed{ peer_id, ..} if peer_id == dst_peer_id => break,
+                            SwarmEvent::Behaviour(_) => {},
+                        e => panic!("[Iteration {}] {:?}", i, e),
                         }
                     }
-                    e => panic!("{:?}", e),
+
+                    loop {
+                        match src_swarm.next_event().await {
+                            SwarmEvent::ConnectionClosed{ peer_id, ..} if peer_id == relay_peer_id => break,
+                            SwarmEvent::Behaviour(_) => {},
+                        e => panic!("[Iteration {}] {:?}", i, e),
+                        }
+                    }
                 }
             }
         };
