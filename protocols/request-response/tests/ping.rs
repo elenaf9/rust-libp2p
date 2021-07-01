@@ -32,14 +32,14 @@ use libp2p_core::{
 use libp2p_noise::{NoiseConfig, X25519Spec, Keypair};
 use libp2p_request_response::*;
 use libp2p_swarm::{Swarm, SwarmEvent};
-use libp2p_tcp::TcpConfig;
+use libp2p_tcp::TokioTcpConfig;
 use futures::{channel::mpsc, executor::LocalPool, prelude::*, task::SpawnExt};
 use rand::{self, Rng};
 use std::{io, iter};
 use std::{collections::HashSet, num::NonZeroU16};
 
-#[test]
-fn is_response_outbound() {
+#[tokio::test] 
+async fn is_response_outbound() {
     let ping = Ping("ping".to_string().into_bytes());
     let offline_peer = PeerId::random();
 
@@ -71,8 +71,8 @@ fn is_response_outbound() {
 }
 
 /// Exercises a simple ping protocol.
-#[test]
-fn ping_protocol() {
+#[tokio::test] 
+async fn ping_protocol() {
     let ping = Ping("ping".to_string().into_bytes());
     let pong = Pong("pong".to_string().into_bytes());
 
@@ -150,12 +150,12 @@ fn ping_protocol() {
         }
     };
 
-    async_std::task::spawn(Box::pin(peer1));
-    let () = async_std::task::block_on(peer2);
+    tokio::spawn(peer1);
+    peer2.await;
 }
 
-#[test]
-fn emits_inbound_connection_closed_failure() {
+#[tokio::test]
+async fn emits_inbound_connection_closed_failure() {
     let ping = Ping("ping".to_string().into_bytes());
 
     let protocols = iter::once((PingProtocol(), ProtocolSupport::Full));
@@ -223,8 +223,8 @@ fn emits_inbound_connection_closed_failure() {
 /// early close as a protocol violation which results in the connection being closed.
 /// If the substream were not properly closed when dropped, the sender would instead
 /// run into a timeout waiting for the response.
-#[test]
-fn emits_inbound_connection_closed_if_channel_is_dropped() {
+#[tokio::test]
+async fn emits_inbound_connection_closed_if_channel_is_dropped() {
     let ping = Ping("ping".to_string().into_bytes());
 
     let protocols = iter::once((PingProtocol(), ProtocolSupport::Full));
@@ -280,8 +280,8 @@ fn emits_inbound_connection_closed_if_channel_is_dropped() {
     });
 }
 
-#[test]
-fn ping_protocol_throttled() {
+#[tokio::test]
+async fn ping_protocol_throttled() {
     let ping = Ping("ping".to_string().into_bytes());
     let pong = Pong("pong".to_string().into_bytes());
 
@@ -375,17 +375,16 @@ fn ping_protocol_throttled() {
             }
         }
     };
-
-    let mut pool = LocalPool::new();
-    pool.spawner().spawn(peer1.boxed()).unwrap();
-    pool.run_until(peer2);
+    
+    tokio::spawn(peer1);
+    peer2.await;
 }
 
 fn mk_transport() -> (PeerId, transport::Boxed<(PeerId, StreamMuxerBox)>) {
     let id_keys = identity::Keypair::generate_ed25519();
     let peer_id = id_keys.public().into_peer_id();
     let noise_keys = Keypair::<X25519Spec>::new().into_authentic(&id_keys).unwrap();
-    (peer_id, TcpConfig::new()
+    (peer_id, TokioTcpConfig::new()
         .nodelay(true)
         .upgrade(upgrade::Version::V1)
         .authenticate(NoiseConfig::xx(noise_keys).into_authenticated())
