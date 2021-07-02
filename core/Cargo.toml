@@ -35,7 +35,7 @@ unsigned-varint = "0.7"
 void = "1"
 zeroize = "1"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(any(target_arch = "wasm32", target_arch = "riscv64" )))'.dependencies]
 ring = { version = "0.16.9", features = ["alloc", "std"], default-features = false }
 
 [dev-dependencies]

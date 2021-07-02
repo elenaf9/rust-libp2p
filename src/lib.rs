@@ -106,7 +106,7 @@ pub use libp2p_uds as uds;
 pub use libp2p_wasm_ext as wasm_ext;
 #[cfg(feature = "websocket")]
 #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
-#[cfg(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown")))]
+#[cfg(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown", target_arch = "riscv64")))]
 #[doc(inline)]
 pub use libp2p_websocket as websocket;
 #[cfg(feature = "yamux")]
@@ -158,7 +158,7 @@ pub use self::transport_ext::TransportExt;
 ///
 /// > **Note**: This `Transport` is not suitable for production usage, as its implementation
 /// >           reserves the right to support additional protocols or remove deprecated protocols.
-#[cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown")), feature = "tcp-async-io", feature = "dns-async-std", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))]
+#[cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown", target_arch = "riscv64")), feature = "tcp-async-io", feature = "dns-async-std", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))]
 #[cfg_attr(docsrs, doc(cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown")), feature = "tcp-async-io", feature = "dns-async-std", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))))]
 pub async fn development_transport(keypair: identity::Keypair)
     -> std::io::Result<core::transport::Boxed<(PeerId, core::muxing::StreamMuxerBox)>>
@@ -193,7 +193,7 @@ pub async fn development_transport(keypair: identity::Keypair)
 ///
 /// > **Note**: This `Transport` is not suitable for production usage, as its implementation
 /// >           reserves the right to support additional protocols or remove deprecated protocols.
-#[cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown")), feature = "tcp-tokio", feature = "dns-tokio", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))]
+#[cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown", target_arch = "riscv64")), feature = "tcp-tokio", feature = "dns-tokio", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))]
 #[cfg_attr(docsrs, doc(cfg(all(not(any(target_os = "emscripten", target_os = "wasi", target_os = "unknown")), feature = "tcp-tokio", feature = "dns-tokio", feature = "websocket", feature = "noise", feature = "mplex", feature = "yamux"))))]
 pub fn tokio_development_transport(keypair: identity::Keypair)
     -> std::io::Result<core::transport::Boxed<(PeerId, core::muxing::StreamMuxerBox)>>
