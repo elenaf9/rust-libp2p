@@ -100,7 +100,7 @@ where
 pub struct ListenerId(u64);
 
 /// A single active listener.
-#[pin_project::pin_project]
+#[pin_project::pin_project(project_replace)]
 #[derive(Debug)]
 struct Listener<TTrans>
 where
@@ -110,9 +110,25 @@ where
     id: ListenerId,
     /// The object that actually listens.
     #[pin]
-    listener: TTrans::Listener,
+    listener: Option<TTrans::Listener>,
     /// Addresses it is listening on.
     addresses: SmallVec<[Multiaddr; 4]>,
+}
+
+impl<TTrans> Stream for Listener<TTrans>
+where
+    TTrans: Transport,
+{
+    type Item = <TTrans::Listener as Stream>::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.listener.is_some() {
+            let project = self.as_mut().project();
+            TryStream::try_poll_next(project.listener.as_pin_mut().unwrap(), cx)
+        } else {
+            Poll::Ready(None)
+        }
+    }
 }
 
 /// Event that can happen on the `ListenersStream`.
@@ -203,7 +219,7 @@ where
         let listener = self.transport.clone().listen_on(addr)?;
         self.listeners.push_back(Box::pin(Listener {
             id: self.next_id,
-            listener,
+            listener: Some(listener),
             addresses: SmallVec::new(),
         }));
         let id = self.next_id;
@@ -216,7 +232,14 @@ where
     /// Return `Ok(())` if a listener with this ID was in the list.
     pub fn remove_listener(&mut self, id: ListenerId) -> Result<(), ()> {
         if let Some(i) = self.listeners.iter().position(|l| l.id == id) {
-            self.listeners.remove(i);
+            let listener = self.listeners.get_mut(i).ok_or(())?;
+            let addresses = listener.as_mut().project().addresses.drain(..).collect();
+            let closed = Listener {
+                id: listener.id,
+                listener: None,
+                addresses,
+            };
+            listener.as_mut().project_replace(closed);
             Ok(())
         } else {
             Err(())
@@ -238,8 +261,7 @@ where
         // We remove each element from `listeners` one by one and add them back.
         let mut remaining = self.listeners.len();
         while let Some(mut listener) = self.listeners.pop_back() {
-            let mut listener_project = listener.as_mut().project();
-            match TryStream::try_poll_next(listener_project.listener.as_mut(), cx) {
+            match TryStream::try_poll_next(listener.as_mut(), cx) {
                 Poll::Pending => {
                     self.listeners.push_front(listener);
                     remaining -= 1;
@@ -252,7 +274,7 @@ where
                     local_addr,
                     remote_addr,
                 }))) => {
-                    let id = *listener_project.id;
+                    let id = listener.id;
                     self.listeners.push_front(listener);
                     return Poll::Ready(ListenersEvent::Incoming {
                         listener_id: id,
@@ -262,13 +284,14 @@ where
                     });
                 }
                 Poll::Ready(Some(Ok(ListenerEvent::NewAddress(a)))) => {
-                    if listener_project.addresses.contains(&a) {
+                    let id = listener.id;
+                    let addresses = &mut listener.as_mut().project().addresses;
+                    if addresses.contains(&a) {
                         debug!("Transport has reported address {} multiple times", a)
                     }
-                    if !listener_project.addresses.contains(&a) {
-                        listener_project.addresses.push(a.clone());
+                    if !addresses.contains(&a) {
+                        addresses.push(a.clone());
                     }
-                    let id = *listener_project.id;
                     self.listeners.push_front(listener);
                     return Poll::Ready(ListenersEvent::NewAddress {
                         listener_id: id,
@@ -276,8 +299,8 @@ where
                     });
                 }
                 Poll::Ready(Some(Ok(ListenerEvent::AddressExpired(a)))) => {
-                    listener_project.addresses.retain(|x| x != &a);
-                    let id = *listener_project.id;
+                    listener.as_mut().project().addresses.retain(|x| x != &a);
+                    let id = listener.id;
                     self.listeners.push_front(listener);
                     return Poll::Ready(ListenersEvent::AddressExpired {
                         listener_id: id,
@@ -285,7 +308,7 @@ where
                     });
                 }
                 Poll::Ready(Some(Ok(ListenerEvent::Error(error)))) => {
-                    let id = *listener_project.id;
+                    let id = listener.id;
                     self.listeners.push_front(listener);
                     return Poll::Ready(ListenersEvent::Error {
                         listener_id: id,
@@ -293,18 +316,20 @@ where
                     });
                 }
                 Poll::Ready(None) => {
+                    let addresses = listener.as_mut().project().addresses.drain(..).collect();
                     return Poll::Ready(ListenersEvent::Closed {
-                        listener_id: *listener_project.id,
-                        addresses: listener_project.addresses.drain(..).collect(),
+                        listener_id: listener.id,
+                        addresses,
                         reason: Ok(()),
-                    })
+                    });
                 }
                 Poll::Ready(Some(Err(err))) => {
+                    let addresses = listener.as_mut().project().addresses.drain(..).collect();
                     return Poll::Ready(ListenersEvent::Closed {
-                        listener_id: *listener_project.id,
-                        addresses: listener_project.addresses.drain(..).collect(),
+                        listener_id: listener.id,
+                        addresses,
                         reason: Err(err),
-                    })
+                    });
                 }
             }
         }
