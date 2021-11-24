@@ -27,7 +27,7 @@ use multiaddr::Multiaddr;
 use std::{pin::Pin, task::Context, task::Poll};
 
 /// See `Transport::map`.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Map<T, F> {
     transport: T,
     fun: F,
@@ -76,7 +76,7 @@ where
 ///
 /// Maps a function over every stream item.
 #[pin_project::pin_project]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MapStream<T, F> {
     #[pin]
     stream: T,
@@ -131,7 +131,7 @@ where
 ///
 /// Applies a function to the inner future's result.
 #[pin_project::pin_project]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MapFuture<T, F> {
     #[pin]
     inner: T,

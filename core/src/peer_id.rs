@@ -164,7 +164,7 @@ impl From<PeerId> for Vec<u8> {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum ParseError {
     #[error("base-58 decode error: {0}")]
     B58(#[from] bs58::decode::Error),

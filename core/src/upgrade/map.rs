@@ -23,7 +23,7 @@ use futures::prelude::*;
 use std::{pin::Pin, task::Context, task::Poll};
 
 /// Wraps around an upgrade and applies a closure to the output.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapInboundUpgrade<U, F> {
     upgrade: U,
     fun: F,
@@ -78,7 +78,7 @@ where
 }
 
 /// Wraps around an upgrade and applies a closure to the output.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapOutboundUpgrade<U, F> {
     upgrade: U,
     fun: F,
@@ -133,7 +133,7 @@ where
 }
 
 /// Wraps around an upgrade and applies a closure to the error.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapInboundUpgradeErr<U, F> {
     upgrade: U,
     fun: F,
@@ -188,7 +188,7 @@ where
 }
 
 /// Wraps around an upgrade and applies a closure to the error.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapOutboundUpgradeErr<U, F> {
     upgrade: U,
     fun: F,
@@ -243,6 +243,7 @@ where
 }
 
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapFuture<TInnerFut, TMap> {
     #[pin]
     inner: TInnerFut,
@@ -270,6 +271,7 @@ where
 }
 
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapErrFuture<T, F> {
     #[pin]
     fut: T,

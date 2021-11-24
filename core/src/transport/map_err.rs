@@ -24,7 +24,7 @@ use multiaddr::Multiaddr;
 use std::{error, pin::Pin, task::Context, task::Poll};
 
 /// See `Transport::map_err`.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MapErr<T, F> {
     transport: T,
     map: F,
@@ -75,6 +75,7 @@ where
 
 /// Listening stream for `MapErr`.
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapErrListener<T: Transport, F> {
     #[pin]
     inner: T::Listener,
@@ -111,6 +112,7 @@ where
 
 /// Listening upgrade future for `MapErr`.
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapErrListenerUpgrade<T: Transport, F> {
     #[pin]
     inner: T::ListenerUpgrade,
@@ -139,6 +141,7 @@ where
 
 /// Dialing future for `MapErr`.
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MapErrDial<T: Transport, F> {
     #[pin]
     inner: T::Dial,

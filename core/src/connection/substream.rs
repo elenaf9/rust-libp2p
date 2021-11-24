@@ -57,6 +57,7 @@ impl<TDialInfo> SubstreamEndpoint<TDialInfo> {
 ///
 /// The stream will close once both the inbound and outbound channels are closed, and no more
 /// outbound substream attempt is pending.
+#[derive(Clone, PartialEq)]
 pub struct Muxing<TMuxer, TUserData>
 where
     TMuxer: StreamMuxer,
@@ -68,6 +69,7 @@ where
 }
 
 /// Future that signals the remote that we have closed the connection.
+#[derive(Clone, PartialEq)]
 pub struct Close<TMuxer> {
     /// Muxer to close.
     muxer: Arc<TMuxer>,

@@ -32,7 +32,7 @@ pub fn test_network(cfg: NetworkConfig) -> TestNetwork {
     TestNetwork::new(transport, local_public_key.into(), cfg)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TestHandler();
 
 impl ConnectionHandler for TestHandler {
@@ -62,6 +62,7 @@ impl ConnectionHandler for TestHandler {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct CloseMuxer<M> {
     state: CloseMuxerState<M>,
 }
@@ -74,6 +75,7 @@ impl<M> CloseMuxer<M> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum CloseMuxerState<M> {
     Close(M),
     Done,

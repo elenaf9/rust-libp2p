@@ -24,7 +24,7 @@ use crate::upgrade::{InboundUpgrade, OutboundUpgrade, UpgradeInfo};
 ///
 /// Wraps around an `Option<T>` and makes it available or not depending on whether it contains or
 /// not an upgrade.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OptionalUpgrade<T>(Option<T>);
 
 impl<T> OptionalUpgrade<T> {
@@ -86,7 +86,7 @@ where
 }
 
 /// Iterator that flattens an `Option<T>` where `T` is an iterator.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Iter<T>(Option<T>);
 
 impl<T> Iterator for Iter<T>

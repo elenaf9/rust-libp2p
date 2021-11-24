@@ -118,6 +118,7 @@ where
 }
 
 /// Event that can happen on the `ListenersStream`.
+#[derive(Clone, PartialEq)]
 pub enum ListenersEvent<TTrans>
 where
     TTrans: Transport,

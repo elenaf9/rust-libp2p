@@ -26,6 +26,7 @@ use std::{fmt, io, marker::PhantomData, pin::Pin};
 /// Implementation of `Transport` that doesn't support any multiaddr.
 ///
 /// Useful for testing purposes, or as a fallback implementation when no protocol is available.
+#[derive(PartialEq)]
 pub struct DummyTransport<TOut = DummyStream>(PhantomData<TOut>);
 
 impl<TOut> DummyTransport<TOut> {
@@ -76,6 +77,7 @@ impl<TOut> Transport for DummyTransport<TOut> {
 }
 
 /// Implementation of `AsyncRead` and `AsyncWrite`. Not meant to be instanciated.
+#[derive(Clone, PartialEq)]
 pub struct DummyStream(());
 
 impl fmt::Debug for DummyStream {

@@ -25,7 +25,7 @@ use void::Void;
 
 /// Dummy implementation of `UpgradeInfo`/`InboundUpgrade`/`OutboundUpgrade` that doesn't support
 /// any protocol.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DeniedUpgrade;
 
 impl UpgradeInfo for DeniedUpgrade {

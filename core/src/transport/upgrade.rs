@@ -65,7 +65,7 @@ use std::{
 ///      [`StreamMuxer`] (from the multiplexing upgrade).
 ///
 /// [`Network`]: crate::Network
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Builder<T> {
     inner: T,
     version: upgrade::Version,
@@ -185,7 +185,7 @@ where
 }
 
 /// An transport with peer authentication, obtained from [`Builder::authenticate`].
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Authenticated<T>(Builder<T>);
 
 impl<T> Authenticated<T>
@@ -287,7 +287,7 @@ where
 
 /// A authenticated and multiplexed transport, obtained from
 /// [`Authenticated::multiplex`].
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Multiplexed<T>(T);
 
 impl<T> Multiplexed<T> {
@@ -355,7 +355,7 @@ type EitherUpgrade<C, U> = future::Either<InboundUpgradeApply<C, U>, OutboundUpg
 /// A custom upgrade on an [`Authenticated`] transport.
 ///
 /// See [`Transport::upgrade`]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Upgrade<T, U> {
     inner: T,
     upgrade: U,
@@ -507,6 +507,7 @@ where
 }
 
 /// The [`Transport::Listener`] stream of an [`Upgrade`]d transport.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ListenerStream<S, U> {
     stream: Pin<Box<S>>,
     upgrade: U,

@@ -23,7 +23,7 @@ use crate::transport::{Transport, TransportError};
 use multiaddr::Multiaddr;
 
 /// Struct returned by `or_transport()`.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OrTransport<A, B>(A, B);
 
 impl<A, B> OrTransport<A, B> {

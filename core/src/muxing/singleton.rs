@@ -38,6 +38,7 @@ use std::{
 ///
 /// Applying this muxer on a connection doesn't read or write any data on the connection itself.
 /// Most notably, no protocol is negotiated.
+#[derive(Debug)]
 pub struct SingletonMuxer<TSocket> {
     /// The inner connection.
     inner: Mutex<TSocket>,
@@ -62,8 +63,10 @@ impl<TSocket> SingletonMuxer<TSocket> {
 }
 
 /// Substream of the `SingletonMuxer`.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Substream {}
 /// Outbound substream attempt of the `SingletonMuxer`.
+#[derive(Debug, Clone, PartialEq)]
 pub struct OutboundSubstream {}
 
 impl<TSocket> StreamMuxer for SingletonMuxer<TSocket>

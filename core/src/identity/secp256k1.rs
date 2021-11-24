@@ -28,7 +28,7 @@ use sha2::{Digest as ShaDigestTrait, Sha256};
 use zeroize::Zeroize;
 
 /// A Secp256k1 keypair.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Keypair {
     secret: SecretKey,
     public: PublicKey,
@@ -75,7 +75,7 @@ impl From<Keypair> for SecretKey {
 }
 
 /// A Secp256k1 secret key.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct SecretKey(libsecp256k1::SecretKey);
 
 impl fmt::Debug for SecretKey {

@@ -30,7 +30,7 @@ use futures::{
 use pin_project::pin_project;
 use std::{fmt, io::Error as IoError, pin::Pin, task::Context, task::Poll};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EitherError<A, B> {
     A(A),
     B(B),
@@ -65,7 +65,7 @@ where
 /// Implements `AsyncRead` and `AsyncWrite` and dispatches all method calls to
 /// either `First` or `Second`.
 #[pin_project(project = EitherOutputProj)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EitherOutput<A, B> {
     First(#[pin] A),
     Second(#[pin] B),
@@ -361,7 +361,7 @@ where
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[must_use = "futures do nothing unless polled"]
 pub enum EitherOutbound<A: StreamMuxer, B: StreamMuxer> {
     A(A::OutboundSubstream),
@@ -370,7 +370,7 @@ pub enum EitherOutbound<A: StreamMuxer, B: StreamMuxer> {
 
 /// Implements `Stream` and dispatches all method calls to either `First` or `Second`.
 #[pin_project(project = EitherListenStreamProj)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[must_use = "futures do nothing unless polled"]
 pub enum EitherListenStream<A, B> {
     First(#[pin] A),
@@ -412,7 +412,7 @@ where
 
 /// Implements `Future` and dispatches all method calls to either `First` or `Second`.
 #[pin_project(project = EitherFutureProj)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[must_use = "futures do nothing unless polled"]
 pub enum EitherFuture<A, B> {
     First(#[pin] A),
@@ -439,7 +439,7 @@ where
 }
 
 #[pin_project(project = EitherFuture2Proj)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[must_use = "futures do nothing unless polled"]
 pub enum EitherFuture2<A, B> {
     A(#[pin] A),
@@ -465,7 +465,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EitherName<A, B> {
     A(A),
     B(B),
@@ -480,7 +480,7 @@ impl<A: ProtocolName, B: ProtocolName> ProtocolName for EitherName<A, B> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EitherTransport<A, B> {
     Left(A),
     Right(B),

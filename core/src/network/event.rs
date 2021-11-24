@@ -289,6 +289,7 @@ where
 }
 
 /// A pending incoming connection produced by a listener.
+#[derive(Debug, Clone, PartialEq)]
 pub struct IncomingConnection<TUpgrade> {
     /// The connection upgrade.
     pub(crate) upgrade: TUpgrade,

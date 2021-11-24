@@ -179,7 +179,7 @@ impl std::error::Error for DecodingError {
 }
 
 /// Errors that occur whilst extracting the payload of a [`SignedEnvelope`].
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ReadPayloadError {
     /// The signature on the signed envelope does not verify with the provided domain separation string.
     InvalidSignature,

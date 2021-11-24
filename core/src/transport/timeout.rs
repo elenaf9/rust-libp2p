@@ -37,7 +37,7 @@ use std::{error, fmt, io, pin::Pin, task::Context, task::Poll, time::Duration};
 ///
 /// **Note**: `listen_on` is never subject to a timeout, only the setup of each
 /// individual accepted connection.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TransportTimeout<InnerTrans> {
     inner: InnerTrans,
     outgoing_timeout: Duration,
@@ -117,6 +117,7 @@ where
 // TODO: can be removed and replaced with an `impl Stream` once impl Trait is fully stable
 //       in Rust (https://github.com/rust-lang/rust/issues/34511)
 #[pin_project::pin_project]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TimeoutListener<InnerStream> {
     #[pin]
     inner: InnerStream,
@@ -160,6 +161,7 @@ where
 //       (https://github.com/rust-lang/rust/issues/34511)
 #[pin_project::pin_project]
 #[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
 pub struct Timeout<InnerFut> {
     #[pin]
     inner: InnerFut,

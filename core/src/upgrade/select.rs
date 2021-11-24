@@ -27,7 +27,7 @@ use crate::{
 /// sub-upgrade.
 ///
 /// The protocols supported by the first element have a higher priority.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SelectUpgrade<A, B>(A, B);
 
 impl<A, B> SelectUpgrade<A, B> {
@@ -93,7 +93,7 @@ where
 }
 
 /// Iterator that combines the protocol names of twp upgrades.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InfoIterChain<A, B>(A, B);
 
 impl<A, B> Iterator for InfoIterChain<A, B>

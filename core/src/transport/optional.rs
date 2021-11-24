@@ -27,7 +27,7 @@ use multiaddr::Multiaddr;
 /// `None`), then any attempt to dial or listen will return `MultiaddrNotSupported`. If it is
 /// enabled (read: contains `Some`), then dialing and listening will be handled by the inner
 /// transport.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OptionalTransport<T>(Option<T>);
 
 impl<T> OptionalTransport<T> {

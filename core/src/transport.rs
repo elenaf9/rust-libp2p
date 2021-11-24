@@ -352,7 +352,7 @@ impl<TUpgr, TErr> ListenerEvent<TUpgr, TErr> {
 
 /// An error during [dialing][Transport::dial] or [listening][Transport::listen_on]
 /// on a [`Transport`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransportError<TErr> {
     /// The [`Multiaddr`] passed as parameter is not supported.
     ///

@@ -488,6 +488,7 @@ impl<'a, THandler: IntoConnectionHandler> DialingAttempt<'a, THandler> {
 }
 
 /// An iterator over the ongoing dialing attempts to a peer.
+#[derive(Debug)]
 pub struct DialingAttemptIter<'a, THandler: IntoConnectionHandler, TTrans: Transport> {
     /// The peer whose dialing attempts are being iterated.
     peer_id: &'a PeerId,

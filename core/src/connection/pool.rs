@@ -129,7 +129,7 @@ impl<TInEvent> EstablishedConnectionInfo<TInEvent> {
         };
     }
 }
-
+#[derive(Debug)]
 struct PendingConnectionInfo<THandler> {
     /// [`PeerId`] of the remote peer.
     peer_id: Option<PeerId>,
@@ -1051,6 +1051,7 @@ impl<TInEvent> EstablishedConnection<'_, TInEvent> {
 }
 
 /// An iterator over established connections in a pool.
+#[derive(Debug)]
 pub struct EstablishedConnectionIter<'a, I, TInEvent> {
     connections: Option<&'a mut FnvHashMap<ConnectionId, EstablishedConnectionInfo<TInEvent>>>,
     ids: I,
@@ -1100,7 +1101,7 @@ where
 }
 
 /// Network connection information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConnectionCounters {
     /// The effective connection limits.
     limits: ConnectionLimits,
@@ -1264,7 +1265,7 @@ fn num_peer_established<TInEvent>(
 /// The configurable connection limits.
 ///
 /// By default no connection limits apply.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConnectionLimits {
     max_pending_incoming: Option<u32>,
     max_pending_outgoing: Option<u32>,

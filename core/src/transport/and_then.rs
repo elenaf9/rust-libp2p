@@ -28,7 +28,7 @@ use multiaddr::Multiaddr;
 use std::{error, marker::PhantomPinned, pin::Pin, task::Context, task::Poll};
 
 /// See the `Transport::and_then` method.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AndThen<T, C> {
     transport: T,
     fun: C,
@@ -91,7 +91,7 @@ where
 ///
 /// Applies a function to every stream item.
 #[pin_project::pin_project]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AndThenStream<TListener, TMap> {
     #[pin]
     stream: TListener,
@@ -155,7 +155,7 @@ where
 /// Custom `Future` to avoid boxing.
 ///
 /// Applies a function to the result of the inner future.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AndThenFuture<TFut, TMap, TMapOut> {
     inner: Either<Pin<Box<TFut>>, Pin<Box<TMapOut>>>,
     args: Option<(TMap, ConnectedPoint)>,

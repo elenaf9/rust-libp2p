@@ -65,7 +65,7 @@ where
 /// Implements the `UpgradeInfo`, `InboundUpgrade` and `OutboundUpgrade` traits.
 ///
 /// The upgrade consists in calling the function passed when creating this struct.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FromFnUpgrade<P, F> {
     protocol_name: P,
     fun: F,

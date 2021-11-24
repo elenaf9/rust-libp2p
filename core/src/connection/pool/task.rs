@@ -42,7 +42,7 @@ use std::pin::Pin;
 use void::Void;
 
 /// Commands that can be sent to a task.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command<T> {
     /// Notify the connection handler of an event.
     NotifyHandler(T),

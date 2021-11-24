@@ -402,7 +402,7 @@ where
     substream: Option<<P::Target as StreamMuxer>::Substream>,
     shutdown_state: ShutdownState,
 }
-
+#[derive(Debug, Clone, PartialEq)]
 enum ShutdownState {
     Shutdown,
     Flush,
@@ -626,7 +626,7 @@ impl StreamMuxer for StreamMuxerBox {
         self.inner.flush_all(cx)
     }
 }
-
+#[derive(Debug)]
 struct Wrap<T>
 where
     T: StreamMuxer,

@@ -472,7 +472,7 @@ struct DialingOpts<THandler, I> {
 }
 
 /// Information about the network obtained by [`Network::info()`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NetworkInfo {
     /// The total number of connected peers.
     num_peers: usize,
@@ -560,7 +560,7 @@ impl NetworkConfig {
 }
 
 /// Possible (synchronous) errors when dialing a peer.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum DialError<THandler> {
     /// The dialing attempt is rejected because of a connection limit.
     ConnectionLimit {

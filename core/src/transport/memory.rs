@@ -39,7 +39,6 @@ use std::{collections::hash_map::Entry, error, fmt, io, num::NonZeroU64, pin::Pi
 lazy_static! {
     static ref HUB: Hub = Hub(Mutex::new(FnvHashMap::default()));
 }
-
 struct Hub(Mutex<FnvHashMap<NonZeroU64, ChannelSender>>);
 
 /// A [`mpsc::Sender`] enabling a [`DialFuture`] to send a [`Channel`] and the
@@ -91,7 +90,7 @@ impl Hub {
 }
 
 /// Transport that supports `/memory/N` multiaddresses.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct MemoryTransport;
 
 /// Connection to a `MemoryTransport` currently being opened.
@@ -211,7 +210,7 @@ impl Transport for MemoryTransport {
 }
 
 /// Error that can be produced from the `MemoryTransport`.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MemoryTransportError {
     /// There's no listener on the given port.
     Unreachable,
@@ -297,6 +296,7 @@ pub type Channel<T> = RwStreamSink<Chan<T>>;
 /// A channel represents an established, in-memory, logical connection between two endpoints.
 ///
 /// Implements `Sink` and `Stream`.
+#[derive(Debug)]
 pub struct Chan<T = Vec<u8>> {
     incoming: mpsc::Receiver<T>,
     outgoing: mpsc::Sender<T>,
