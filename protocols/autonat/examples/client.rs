@@ -21,15 +21,20 @@
 use futures::prelude::*;
 use libp2p::autonat;
 use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
+use libp2p::multiaddr::Protocol;
 use libp2p::swarm::{Swarm, SwarmEvent};
 use libp2p::{identity, Multiaddr, NetworkBehaviour, PeerId};
 use std::error::Error;
+use std::net::Ipv4Addr;
 use std::time::Duration;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "libp2p autonat")]
 struct Opt {
+    #[structopt(long)]
+    listen_port: Option<u16>,
+
     #[structopt(long)]
     server_address: Multiaddr,
 
@@ -52,7 +57,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let behaviour = Behaviour::new(local_key.public());
 
     let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
-    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+    swarm.listen_on(
+        Multiaddr::empty()
+            .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+            .with(Protocol::Tcp(opt.listen_port.unwrap_or(0))),
+    )?;
 
     swarm
         .behaviour_mut()
