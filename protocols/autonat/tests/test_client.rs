@@ -511,3 +511,30 @@ async fn test_outbound_failure() {
 
     run_test_with_timeout(test).await;
 }
+
+#[async_std::test]
+async fn test_waker() {
+    let mut client = init_swarm(Config {
+        retry_interval: Duration::from_secs(1),
+        refresh_interval: Duration::from_secs(1),
+        boot_delay: Duration::from_secs(1),
+        ..Default::default()
+    })
+    .await;
+
+    client
+        .listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap())
+        .unwrap();
+
+    futures::future::poll_fn(|cx| match client.poll_next_unpin(cx) {
+        core::task::Poll::Ready(Some(SwarmEvent::NewListenAddr { address, .. })) => {
+            client.add_external_address(address, AddressScore::Infinite);
+            core::task::Poll::Pending
+        }
+        core::task::Poll::Ready(Some(SwarmEvent::Behaviour(event))) => {
+            core::task::Poll::Ready(event)
+        }
+        _ => core::task::Poll::Pending,
+    })
+    .await;
+}
