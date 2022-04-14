@@ -96,15 +96,8 @@ impl Stream for InAddrInner {
                         },
                         // Consume all events for up/down interface changes.
                         IfWatch::Ready(watch) => {
-                            while let Poll::Ready(ev) = watch.poll_unpin(cx) {
-                                match ev {
-                                    Ok(event) => {
-                                        return Poll::Ready(Some(Ok(event)));
-                                    }
-                                    Err(err) => {
-                                        return Poll::Ready(Some(Err(err)));
-                                    }
-                                }
+                            if let Poll::Ready(ev) = watch.poll_unpin(cx) {
+                                return Poll::Ready(Some(ev));
                             }
                         }
                     }

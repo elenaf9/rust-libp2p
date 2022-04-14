@@ -110,12 +110,6 @@ pub struct Endpoint {
     /// guaranteed a slot in the messages buffer.
     to_endpoint2: mpsc::Sender<ToEndpoint>,
 
-    /// Configuration passed at initialization.
-    // TODO: remove?
-    config: Config,
-    /// Multiaddr of the local UDP socket passed in the configuration at initialization after it
-    /// has potentially been modified to handle port number `0`.
-    local_multiaddr: Multiaddr,
 
     // after bind(), the result is without port=0
     pub(crate) local_addr: SocketAddr,
@@ -150,14 +144,12 @@ impl Endpoint {
             to_endpoint: Mutex::new(to_endpoint_tx),
             to_endpoint2,
             new_connections: Mutex::new(new_connections_rx),
-            config: config.clone(),
-            local_multiaddr: config.multiaddr.clone(), // TODO: no
             local_addr: socket.local_addr()?,
         });
 
         // TODO: just for testing, do proper task spawning
         async_std::task::spawn(background_task(
-            config.clone(),
+            config,
             Arc::downgrade(&endpoint),
             async_std::net::UdpSocket::from(socket),
             new_connections_tx,

@@ -173,6 +173,7 @@ impl Connection {
     /// If the connection is closed, returns why. If the connection is open, returns `None`.
     ///
     /// > **Note**: This method is also the main way to determine whether a connection is closed.
+    #[allow(dead_code)]
     pub(crate) fn close_reason(&self) -> Option<&Error> {
         debug_assert!(!self.is_handshaking);
         self.closed.as_ref()
@@ -283,7 +284,7 @@ impl Connection {
             }
         }
 
-        'send_pending: loop {
+        loop {
             // Sending the pending event to the endpoint. If the endpoint is too busy, we just
             // stop the processing here.
             // There is a bit of a question in play here: should we continue to accept events
@@ -306,7 +307,7 @@ impl Connection {
             // Poll the connection for packets to send on the UDP socket and try to send them on
             // `to_endpoint`.
             // FIXME max_datagrams
-            while let Some(transmit) = self.connection.poll_transmit(now, 1) {
+            if let Some(transmit) = self.connection.poll_transmit(now, 1) {
                 let endpoint = self.endpoint.clone();
                 debug_assert!(self.pending_to_endpoint.is_none());
                 self.pending_to_endpoint = Some(Box::pin(async move {
@@ -315,7 +316,7 @@ impl Connection {
                         .send_udp_packet(transmit.destination, transmit.contents)
                         .await;
                 }));
-                continue 'send_pending;
+                continue;
             }
 
             // Timeout system.
@@ -344,7 +345,7 @@ impl Connection {
 
             // The connection also needs to be able to send control messages to the endpoint. This is
             // handled here, and we try to send them on `to_endpoint` as well.
-            while let Some(endpoint_event) = self.connection.poll_endpoint_events() {
+            if let Some(endpoint_event) = self.connection.poll_endpoint_events() {
                 let endpoint = self.endpoint.clone();
                 let connection_id = self.connection_id;
                 debug_assert!(self.pending_to_endpoint.is_none());
@@ -353,7 +354,7 @@ impl Connection {
                         .report_quinn_event(connection_id, endpoint_event)
                         .await;
                 }));
-                continue 'send_pending;
+                continue;
             }
 
             // The final step consists in handling the events related to the various substreams.

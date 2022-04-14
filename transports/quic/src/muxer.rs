@@ -105,7 +105,7 @@ impl StreamMuxer for QuicMuxer {
                 ConnectionEvent::Connected => {
                     tracing::error!("Unexpected Connected event on established QUIC connection");
                 }
-                ConnectionEvent::ConnectionLost(e) => {
+                ConnectionEvent::ConnectionLost(_) => {
                     if let Some(waker) = inner.poll_close_waker.take() {
                         waker.wake();
                     }
@@ -422,7 +422,7 @@ impl StreamMuxer for QuicMuxer {
             // return Poll::Ready(Ok(()))
         } else {
             for substream in inner.substreams.clone().keys() {
-                inner.connection.shutdown_substream(*substream);
+                let _ = inner.connection.shutdown_substream(*substream);
             }
         }
 
