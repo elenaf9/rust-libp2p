@@ -25,10 +25,11 @@
 //!
 //! To run this example, follow the instructions in `examples/server` to start a server, then run in a new terminal:
 //! ```sh
-//! cargo run --example client -- --server-address <server-addr> --server-peer-id <server-peer-id> --listen_port <port>
+//! cargo run --example client -- --server-address <server-addr> --server-peer-id <server-peer-id> --listen-port <port>
 //! ```
-//! The `listen_port` parameter is optional and allows to set a fixed port at which the local client should listen.
+//! The `listen-port` parameter is optional and allows to set a fixed port at which the local client should listen.
 
+use clap::Parser;
 use futures::prelude::*;
 use libp2p::autonat;
 use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
@@ -38,18 +39,17 @@ use libp2p::{identity, Multiaddr, NetworkBehaviour, PeerId};
 use std::error::Error;
 use std::net::Ipv4Addr;
 use std::time::Duration;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "libp2p autonat")]
+#[derive(Debug, Parser)]
+#[clap(name = "libp2p autonat")]
 struct Opt {
-    #[structopt(long)]
+    #[clap(long)]
     listen_port: Option<u16>,
 
-    #[structopt(long)]
+    #[clap(long)]
     server_address: Multiaddr,
 
-    #[structopt(long)]
+    #[clap(long)]
     server_peer_id: PeerId,
 }
 
@@ -57,7 +57,7 @@ struct Opt {
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let local_key = identity::Keypair::generate_ed25519();
     let local_peer_id = PeerId::from(local_key.public());
