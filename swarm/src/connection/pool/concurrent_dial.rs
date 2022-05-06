@@ -53,24 +53,27 @@ impl<TTrans: Transport> Unpin for ConcurrentDial<TTrans> {}
 
 impl<TTrans> ConcurrentDial<TTrans>
 where
-    TTrans: Transport + Clone + Send + 'static,
+    TTrans: Transport + Send + 'static,
     TTrans::Output: Send,
     TTrans::Error: Send,
     TTrans::Dial: Send + 'static,
 {
     pub(crate) fn new(
-        transport: TTrans,
+        transport: &mut TTrans,
         peer: Option<PeerId>,
         addresses: impl Iterator<Item = Multiaddr> + Send + 'static,
         concurrency_factor: NonZeroU8,
         role_override: Endpoint,
     ) -> Self {
-        let mut pending_dials = addresses.map(move |address| match p2p_addr(peer, address) {
-            Ok(address) => {
-                let dial = match role_override {
-                    Endpoint::Dialer => transport.clone().dial(address.clone()),
-                    Endpoint::Listener => transport.clone().dial_as_listener(address.clone()),
-                };
+        let address_dials: Vec<_> = addresses.map(|addr| p2p_addr(peer, addr).map(|a| {
+            let dial = match role_override {
+                    Endpoint::Dialer => transport.dial(a.clone()),
+                    Endpoint::Listener => transport.dial_as_listener(a.clone()),
+            };
+            (a, dial)
+        })).collect();
+        let mut pending_dials = address_dials.into_iter().map(move |address_dials| match address_dials {
+            Ok((address, dial)) => {
                 match dial {
                     Ok(fut) => fut
                         .map(|r| (address, r.map_err(|e| TransportError::Other(e))))

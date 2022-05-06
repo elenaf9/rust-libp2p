@@ -516,7 +516,7 @@ where
             .with_substream_upgrade_protocol_override(self.substream_upgrade_protocol_override);
 
         match self.pool.add_outgoing(
-            self.listeners.transport().clone(),
+            self.listeners.transport(),
             addresses,
             peer_id,
             handler,
@@ -1056,12 +1056,14 @@ where
                     //
                     // The translation is transport-specific. See [`Transport::address_translation`].
                     let translated_addresses = {
-                        let transport = this.listeners.transport();
-                        let mut addrs: Vec<_> = this
+                        let server_addrs: Vec<Multiaddr> = this
                             .listeners
                             .listen_addrs()
-                            .filter_map(move |server| {
-                                transport.address_translation(server, &address)
+                            .cloned()
+                            .collect();
+                        let transport = this.listeners.transport();
+                        let mut addrs: Vec<_> = server_addrs.into_iter().filter_map(move |server| {
+                                transport.address_translation(&server, &address)
                             })
                             .collect();
 
@@ -1572,6 +1574,7 @@ mod tests {
     use libp2p_core::multiaddr::multiaddr;
     use libp2p_core::transport::ListenerEvent;
     use libp2p_core::Endpoint;
+    use libp2p_tcp::TcpConfig;
     use quickcheck::{quickcheck, Arbitrary, Gen, QuickCheck};
     use rand::prelude::SliceRandom;
     use rand::Rng;
@@ -1591,17 +1594,18 @@ mod tests {
         T::OutEvent: Clone,
         O: Send + 'static,
     {
-        let id_keys = identity::Keypair::generate_ed25519();
-        let local_public_key = id_keys.public();
-        let transport = transport::MemoryTransport::default()
-            .upgrade(upgrade::Version::V1)
-            .authenticate(plaintext::PlainText2Config {
-                local_public_key: local_public_key.clone(),
-            })
-            .multiplex(yamux::YamuxConfig::default())
-            .boxed();
-        let behaviour = CallTraceBehaviour::new(MockBehaviour::new(handler_proto));
-        SwarmBuilder::new(transport, behaviour, local_public_key.into())
+        todo!()
+        // let id_keys = identity::Keypair::generate_ed25519();
+        // let local_public_key = id_keys.public();
+        // let transport = TcpConfig::new()
+        //     .upgrade(upgrade::Version::V1)
+        //     .authenticate(plaintext::PlainText2Config {
+        //         local_public_key: local_public_key.clone(),
+        //     })
+        //     .multiplex(yamux::YamuxConfig::default())
+        //     .boxed();
+        // let behaviour = CallTraceBehaviour::new(MockBehaviour::new(handler_proto));
+        // SwarmBuilder::new(transport, behaviour, local_public_key.into())
     }
 
     fn swarms_connected<TBehaviour>(
@@ -2013,12 +2017,12 @@ mod tests {
                 let mut listen_addresses = Vec::new();
                 let mut listeners = Vec::new();
                 for _ in 0..num_listen_addrs {
-                    let mut listener = transport::MemoryTransport {}
-                        .listen_on("/memory/0".parse().unwrap())
+                    let mut listener = TcpConfig::new();
+                    listener.listen_on(ListenerId::new(1), "/memory/0".parse().unwrap())
                         .unwrap();
 
-                    match listener.next().await.unwrap().unwrap() {
-                        ListenerEvent::NewAddress(address) => {
+                    match listener.next().await.unwrap() {
+                        ListenerEvent::NewAddress {address, ..}=> {
                             listen_addresses.push(address);
                         }
                         _ => panic!("Expected `NewListenAddr` event."),
@@ -2039,7 +2043,7 @@ mod tests {
                 for mut listener in listeners.into_iter() {
                     loop {
                         match futures::future::select(listener.next(), swarm.next()).await {
-                            Either::Left((Some(Ok(ListenerEvent::Upgrade { .. })), _)) => {
+                            Either::Left((Some(ListenerEvent::Upgrade { .. }), _)) => {
                                 break;
                             }
                             Either::Left(_) => {
