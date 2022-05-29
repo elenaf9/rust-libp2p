@@ -38,7 +38,6 @@ fn async_write() {
 
         transport
             .listen_on(
-                libp2p_core::transport::ListenerId::new(1),
                 "/ip4/127.0.0.1/tcp/0".parse().unwrap(),
             )
             .unwrap();

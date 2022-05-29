@@ -25,7 +25,7 @@ use futures::{
 use libp2p_core::{
     identity,
     multiaddr::Multiaddr,
-    transport::{ListenerId, Transport},
+    transport::Transport,
     upgrade,
 };
 use libp2p_plaintext::PlainText2Config;
@@ -78,9 +78,7 @@ fn variable_msg_length() {
                     .parse()
                     .unwrap();
 
-            server
-                .listen_on(ListenerId::new(1), server_address.clone())
-                .unwrap();
+            server.listen_on(server_address.clone()).unwrap();
 
             // Ignore server listen address event.
             let _ = server

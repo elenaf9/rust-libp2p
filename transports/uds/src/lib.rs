@@ -65,6 +65,7 @@ macro_rules! codegen {
         #[cfg_attr(docsrs, doc(cfg(feature = $feature_name)))]
         pub struct $uds_config {
             listeners: VecDeque<(ListenerId, Listener<Self>)>,
+            next_listener_id: ListenerId,
         }
 
         impl $uds_config {
@@ -72,6 +73,7 @@ macro_rules! codegen {
             pub fn new() -> $uds_config {
                 $uds_config {
                     listeners: VecDeque::new(),
+                    next_listener_id: ListenerId::new::<Self>(1),
                 }
             }
         }
@@ -88,12 +90,9 @@ macro_rules! codegen {
             type ListenerUpgrade = Ready<Result<Self::Output, Self::Error>>;
             type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-            fn listen_on(
-                &mut self,
-                id: ListenerId,
-                addr: Multiaddr,
-            ) -> Result<(), TransportError<Self::Error>> {
+            fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
                 if let Ok(path) = multiaddr_to_path(&addr) {
+                    let id = self.next_listener_id.next_id();
                     let listener = $build_listener(path)
                         .map_err(Err)
                         .map_ok(move |listener| {
@@ -135,7 +134,7 @@ macro_rules! codegen {
                         .try_flatten_stream()
                         .boxed();
                     self.listeners.push_back((id, listener));
-                    Ok(())
+                    Ok(id)
                 } else {
                     Err(TransportError::MultiaddrNotSupported(addr))
                 }
@@ -257,7 +256,6 @@ mod tests {
     use futures::{channel::oneshot, prelude::*};
     use libp2p_core::{
         multiaddr::{Multiaddr, Protocol},
-        transport::ListenerId,
         Transport,
     };
     use std::{self, borrow::Cow, path::Path};
@@ -291,7 +289,7 @@ mod tests {
 
         async_std::task::spawn(async move {
             let mut transport = UdsConfig::new().boxed();
-            transport.listen_on(ListenerId::new(1), addr).unwrap();
+            transport.listen_on(addr).unwrap();
 
             let listen_addr = transport
                 .select_next_some()
@@ -327,7 +325,7 @@ mod tests {
         let mut uds = UdsConfig::new();
 
         let addr = "/unix//foo/bar".parse::<Multiaddr>().unwrap();
-        assert!(uds.listen_on(ListenerId::new(1), addr).is_err());
+        assert!(uds.listen_on(addr).is_err());
     }
 
     #[test]

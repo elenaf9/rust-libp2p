@@ -38,7 +38,6 @@ fn client_to_server_outbound() {
 
         transport
             .listen_on(
-                libp2p_core::transport::ListenerId::new(1),
                 "/ip4/127.0.0.1/tcp/0".parse().unwrap(),
             )
             .unwrap();
@@ -109,7 +108,6 @@ fn client_to_server_inbound() {
 
         transport
             .listen_on(
-                libp2p_core::transport::ListenerId::new(1),
                 "/ip4/127.0.0.1/tcp/0".parse().unwrap(),
             )
             .unwrap();
@@ -180,7 +178,6 @@ fn protocol_not_match() {
 
         transport
             .listen_on(
-                libp2p_core::transport::ListenerId::new(1),
                 "/ip4/127.0.0.1/tcp/0".parse().unwrap(),
             )
             .unwrap();
