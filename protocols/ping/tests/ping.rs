@@ -62,7 +62,7 @@ fn ping_pong() {
         let peer1 = async move {
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::NewListenAddr { address, .. } => tx.send(address).await.unwrap(),
+                    SwarmEvent::NewListenAddr(address) => tx.send(address).await.unwrap(),
                     SwarmEvent::Behaviour(ping::Event {
                         peer,
                         result: Ok(ping::Success::Ping { rtt }),
@@ -139,7 +139,7 @@ fn max_failures() {
 
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::NewListenAddr { address, .. } => tx.send(address).await.unwrap(),
+                    SwarmEvent::NewListenAddr(address) => tx.send(address).await.unwrap(),
                     SwarmEvent::Behaviour(ping::Event {
                         result: Ok(ping::Success::Ping { .. }),
                         ..
@@ -209,7 +209,7 @@ fn unsupported_doesnt_fail() {
     async_std::task::spawn(async move {
         loop {
             match swarm1.select_next_some().await {
-                SwarmEvent::NewListenAddr { address, .. } => tx.send(address).await.unwrap(),
+                SwarmEvent::NewListenAddr(address) => tx.send(address).await.unwrap(),
                 _ => {}
             }
         }

@@ -118,7 +118,7 @@ fn new_reservation_to_same_relay_replaces_old() {
     ));
 
     // Trigger new reservation.
-    let new_listener = client.listen_on(client_addr.clone()).unwrap();
+    client.listen_on(client_addr.clone()).unwrap();
 
     // Wait for
     // - listener of old reservation to close
@@ -132,12 +132,9 @@ fn new_reservation_to_same_relay_replaces_old() {
             match client.select_next_some().await {
                 SwarmEvent::ListenerClosed {
                     addresses,
-                    listener_id,
                     ..
                 } => {
                     assert_eq!(addresses, vec![client_addr_with_peer_id.clone()]);
-                    assert_eq!(listener_id, old_listener);
-
                     old_listener_closed = true;
                     if new_reservation_accepted && new_listener_address_reported {
                         break;
@@ -156,12 +153,8 @@ fn new_reservation_to_same_relay_replaces_old() {
                         break;
                     }
                 }
-                SwarmEvent::NewListenAddr {
-                    address,
-                    listener_id,
-                } => {
-                    assert_eq!(address, client_addr_with_peer_id);
-                    assert_eq!(listener_id, new_listener);
+                SwarmEvent::NewListenAddr(addr) => {
+                    assert_eq!(addr, client_addr_with_peer_id);
 
                     new_listener_address_reported = true;
                     if old_listener_closed && new_reservation_accepted {
@@ -424,7 +417,7 @@ async fn wait_for_reservation(
                     break;
                 }
             }
-            SwarmEvent::NewListenAddr { address, .. } if address == client_addr => {
+            SwarmEvent::NewListenAddr( address ) if address == client_addr => {
                 new_listen_addr = true;
                 if reservation_req_accepted {
                     break;

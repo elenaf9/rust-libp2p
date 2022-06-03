@@ -230,10 +230,10 @@ impl<TBvEv, THandleErr> super::Recorder<libp2p_swarm::SwarmEvent<TBvEv, THandleE
             libp2p_swarm::SwarmEvent::BannedPeer { .. } => {
                 self.swarm.connected_to_banned_peer.inc();
             }
-            libp2p_swarm::SwarmEvent::NewListenAddr { .. } => {
+            libp2p_swarm::SwarmEvent::NewListenAddr(_) => {
                 self.swarm.new_listen_addr.inc();
             }
-            libp2p_swarm::SwarmEvent::ExpiredListenAddr { .. } => {
+            libp2p_swarm::SwarmEvent::ExpiredListenAddr(_) => {
                 self.swarm.expired_listen_addr.inc();
             }
             libp2p_swarm::SwarmEvent::ListenerClosed { .. } => {

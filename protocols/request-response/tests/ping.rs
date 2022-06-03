@@ -103,7 +103,7 @@ fn ping_protocol() {
     let peer1 = async move {
         loop {
             match swarm1.select_next_some().await {
-                SwarmEvent::NewListenAddr { address, .. } => tx.send(address).await.unwrap(),
+                SwarmEvent::NewListenAddr(address) => tx.send(address).await.unwrap(),
                 SwarmEvent::Behaviour(RequestResponseEvent::Message {
                     peer,
                     message:

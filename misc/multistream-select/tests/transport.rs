@@ -82,7 +82,7 @@ fn transport_upgrade() {
         let mut addr_sender = Some(addr_sender);
         let server = futures::future::poll_fn(move |cx| loop {
             match ready!(listener.poll_next_unpin(cx)).unwrap() {
-                SwarmEvent::NewListenAddr { address, .. } => {
+                SwarmEvent::NewListenAddr(address) => {
                     addr_sender.take().unwrap().send(address).unwrap();
                 }
                 SwarmEvent::IncomingConnection { .. } => {}

@@ -474,7 +474,7 @@ mod network {
                 SwarmEvent::Behaviour(ComposedEvent::RequestResponse(
                     RequestResponseEvent::ResponseSent { .. },
                 )) => {}
-                SwarmEvent::NewListenAddr { address, .. } => {
+                SwarmEvent::NewListenAddr(address) => {
                     let local_peer_id = *self.swarm.local_peer_id();
                     println!(
                         "Local node is listening on {:?}",

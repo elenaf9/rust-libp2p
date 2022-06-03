@@ -191,8 +191,8 @@ async fn wait_for_reservation(
     let mut reservation_req_accepted = false;
     loop {
         match client.select_next_some().await {
-            SwarmEvent::NewListenAddr { address, .. } if address != client_addr => {}
-            SwarmEvent::NewListenAddr { address, .. } if address == client_addr => {
+            SwarmEvent::NewListenAddr(address) if address != client_addr => {)
+            SwarmEvent::NewListenAddr( address ) if address == client_addr => {
                 new_listen_addr_for_relayed_addr = true;
                 if reservation_req_accepted {
                     break;
@@ -236,7 +236,7 @@ async fn wait_for_connection_established(client: &mut Swarm<Client>, addr: &Mult
 
 async fn wait_for_new_listen_addr(client: &mut Swarm<Client>, new_addr: &Multiaddr) {
     match client.select_next_some().await {
-        SwarmEvent::NewListenAddr { address, .. } if address == *new_addr => {}
+        SwarmEvent::NewListenAddr(address) if address == *new_addr => {)
         e => panic!("{:?}", e),
     }
 }

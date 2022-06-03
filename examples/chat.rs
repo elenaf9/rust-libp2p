@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .floodsub
                 .publish(floodsub_topic.clone(), line.expect("Stdin not to close").as_bytes()),
             event = swarm.select_next_some() => match event {
-                SwarmEvent::NewListenAddr { address, .. } => {
+                SwarmEvent::NewListenAddr(address) => {
                     println!("Listening on {:?}", address);
                 }
                 SwarmEvent::Behaviour(OutEvent::Floodsub(

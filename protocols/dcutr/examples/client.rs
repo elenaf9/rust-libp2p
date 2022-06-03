@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             futures::select! {
                 event = swarm.next() => {
                     match event.unwrap() {
-                        SwarmEvent::NewListenAddr { address, .. } => {
+                        SwarmEvent::NewListenAddr( address ) => {
                             info!("Listening on {:?}", address);
                         }
                         event => panic!("{:?}", event),
@@ -198,7 +198,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         loop {
             match swarm.next().await.unwrap() {
-                SwarmEvent::NewListenAddr { .. } => {}
+                SwarmEvent::NewListenAddr( .. } => {)
                 SwarmEvent::Dialing { .. } => {}
                 SwarmEvent::ConnectionEstablished { .. } => {}
                 SwarmEvent::Behaviour(Event::Ping(_)) => {}
@@ -242,7 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     block_on(async {
         loop {
             match swarm.next().await.unwrap() {
-                SwarmEvent::NewListenAddr { address, .. } => {
+                SwarmEvent::NewListenAddr( address ) => {
                     info!("Listening on {:?}", address);
                 }
                 SwarmEvent::Behaviour(Event::Relay(client::Event::ReservationReqAccepted {

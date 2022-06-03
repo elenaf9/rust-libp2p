@@ -565,7 +565,7 @@ mod tests {
                 let swarm1_fut = swarm1.select_next_some();
                 pin_mut!(swarm1_fut);
                 match swarm1_fut.await {
-                    SwarmEvent::NewListenAddr { address, .. } => return address,
+                    SwarmEvent::NewListenAddr(address) => return address,
                     _ => {}
                 }
             }
@@ -644,7 +644,7 @@ mod tests {
                 let swarm1_fut = swarm1.select_next_some();
                 pin_mut!(swarm1_fut);
                 match swarm1_fut.await {
-                    SwarmEvent::NewListenAddr { address, .. } => return address,
+                    SwarmEvent::NewListenAddr(address) => return address,
                     _ => {}
                 }
             }
@@ -715,17 +715,14 @@ mod tests {
 
         let swarm1_peer_id = *swarm1.local_peer_id();
 
-        let listener = swarm1
+        swarm1
             .listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap())
             .unwrap();
 
         let listen_addr = async_std::task::block_on(async {
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::NewListenAddr {
-                        address,
-                        listener_id,
-                    } if listener_id == listener => return address,
+                    SwarmEvent::NewListenAddr(addr) => return addr,
                     _ => {}
                 }
             }

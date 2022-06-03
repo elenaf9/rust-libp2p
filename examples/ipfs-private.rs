@@ -282,7 +282,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             event = swarm.select_next_some() => {
-                if let SwarmEvent::NewListenAddr { address, .. } = event {
+                if let SwarmEvent::NewListenAddr(address)= event {
                     println!("Listening on {:?}", address);
                 }
             }

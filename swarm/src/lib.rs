@@ -206,24 +206,12 @@ pub enum SwarmEvent<TBehaviourOutEvent, THandlerErr> {
         /// Endpoint of the connection that has been closed.
         endpoint: ConnectedPoint,
     },
-    /// One of our listeners has reported a new local listening address.
-    NewListenAddr {
-        /// The listener that is listening on the new address.
-        listener_id: ListenerId,
-        /// The new address that is being listened on.
-        address: Multiaddr,
-    },
-    /// One of our listeners has reported the expiration of a listening address.
-    ExpiredListenAddr {
-        /// The listener that is no longer listening on the address.
-        listener_id: ListenerId,
-        /// The expired address.
-        address: Multiaddr,
-    },
+    /// Our transport has reported a new local listening address.
+    NewListenAddr(Multiaddr),
+    /// Our transport has reported the expiration of a listening address.
+    ExpiredListenAddr(Multiaddr),
     /// One of the listeners gracefully closed.
     ListenerClosed {
-        /// The listener that closed.
-        listener_id: ListenerId,
         /// The addresses that the listener was listening on. These addresses are now considered
         /// expired, similar to if a [`ExpiredListenAddr`](SwarmEvent::ExpiredListenAddr) event
         /// has been generated for each of them.
@@ -234,8 +222,6 @@ pub enum SwarmEvent<TBehaviourOutEvent, THandlerErr> {
     },
     /// One of the listeners reported a non-fatal error.
     ListenerError {
-        /// The listener that errored.
-        listener_id: ListenerId,
         /// The listener error.
         error: io::Error,
     },
@@ -872,10 +858,7 @@ where
                     addrs.push(listen_addr.clone())
                 }
                 self.behaviour.inject_new_listen_addr(&listen_addr);
-                return Some(SwarmEvent::NewListenAddr {
-                    listener_id,
-                    address: listen_addr,
-                });
+                return Some(SwarmEvent::NewListenAddr(listen_addr));
             }
             TransportEvent::AddressExpired {
                 listener_id,
@@ -890,10 +873,7 @@ where
                     addrs.retain(|a| a != &listen_addr);
                 }
                 self.behaviour.inject_expired_listen_addr(&listen_addr);
-                return Some(SwarmEvent::ExpiredListenAddr {
-                    listener_id,
-                    address: listen_addr,
-                });
+                return Some(SwarmEvent::ExpiredListenAddr(listen_addr));
             }
             TransportEvent::ListenerClosed {
                 listener_id,
@@ -909,14 +889,13 @@ where
                     Err(err) => Err(err),
                 });
                 return Some(SwarmEvent::ListenerClosed {
-                    listener_id,
                     addresses: addrs.to_vec(),
                     reason,
                 });
             }
-            TransportEvent::Error { listener_id, error } => {
+            TransportEvent::Error { error, .. } => {
                 self.behaviour.inject_listener_error(&error);
-                return Some(SwarmEvent::ListenerError { listener_id, error });
+                return Some(SwarmEvent::ListenerError { error });
             }
         }
         None
@@ -2192,7 +2171,7 @@ mod tests {
             let _ = network1.listen_on(multiaddr![Memory(0u64)]).unwrap();
             let listen_addr = async_std::task::block_on(poll_fn(|cx| {
                 match ready!(network1.poll_next_unpin(cx)).unwrap() {
-                    SwarmEvent::NewListenAddr { address, .. } => Poll::Ready(address),
+                    SwarmEvent::NewListenAddr(address) => Poll::Ready(address),
                     e => panic!("Unexpected network event: {:?}", e),
                 }
             }));
@@ -2299,9 +2278,7 @@ mod tests {
 
         let address =
             futures::executor::block_on(future::poll_fn(|cx| match swarm1.poll_next_unpin(cx) {
-                Poll::Ready(Some(SwarmEvent::NewListenAddr { address, .. })) => {
-                    Poll::Ready(address)
-                }
+                Poll::Ready(Some(SwarmEvent::NewListenAddr(address))) => Poll::Ready(address),
                 Poll::Pending => Poll::Pending,
                 _ => panic!("Was expecting the listen address to be reported"),
             }));
@@ -2357,9 +2334,7 @@ mod tests {
 
         let local_address =
             futures::executor::block_on(future::poll_fn(|cx| match swarm.poll_next_unpin(cx) {
-                Poll::Ready(Some(SwarmEvent::NewListenAddr { address, .. })) => {
-                    Poll::Ready(address)
-                }
+                Poll::Ready(Some(SwarmEvent::NewListenAddr(address))) => Poll::Ready(address),
                 Poll::Pending => Poll::Pending,
                 _ => panic!("Was expecting the listen address to be reported"),
             }));
@@ -2481,7 +2456,7 @@ mod tests {
         let listener_peer_id = *listener.local_peer_id();
         listener.listen_on(multiaddr![Memory(0u64)]).unwrap();
         let listener_address = match block_on(listener.next()).unwrap() {
-            SwarmEvent::NewListenAddr { address, .. } => address,
+            SwarmEvent::NewListenAddr(address) => address,
             e => panic!("Unexpected network event: {:?}", e),
         };
 

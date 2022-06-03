@@ -59,7 +59,7 @@ async fn spawn_server(kill: oneshot::Receiver<()>) -> (PeerId, Multiaddr) {
             .unwrap();
         let addr = loop {
             match server.select_next_some().await {
-                SwarmEvent::NewListenAddr { address, .. } => break address,
+                SwarmEvent::NewListenAddr(address) => break address,
                 _ => {}
             };
         };
@@ -178,7 +178,7 @@ async fn test_auto_probe() {
             .unwrap();
         loop {
             match client.select_next_some().await {
-                SwarmEvent::NewListenAddr { .. } => break,
+                SwarmEvent::NewListenAddr(_) => break,
                 _ => {}
             }
         }
@@ -216,8 +216,8 @@ async fn test_auto_probe() {
                     break;
                 }
                 SwarmEvent::IncomingConnection { .. }
-                | SwarmEvent::NewListenAddr { .. }
-                | SwarmEvent::ExpiredListenAddr { .. } => {}
+                | SwarmEvent::NewListenAddr(_)
+                | SwarmEvent::ExpiredListenAddr(_) => {}
                 other => panic!("Unexpected swarm event: {:?}.", other),
             }
         }
@@ -270,7 +270,7 @@ async fn test_confidence() {
                 .unwrap();
             loop {
                 match client.select_next_some().await {
-                    SwarmEvent::NewListenAddr { .. } => break,
+                    SwarmEvent::NewListenAddr(_) => break,
                     _ => {}
                 }
             }
@@ -358,7 +358,7 @@ async fn test_throttle_server_period() {
             .unwrap();
         loop {
             match client.select_next_some().await {
-                SwarmEvent::NewListenAddr { .. } => break,
+                SwarmEvent::NewListenAddr(_) => break,
                 _ => {}
             }
         }
@@ -478,7 +478,7 @@ async fn test_outbound_failure() {
 
         loop {
             match client.select_next_some().await {
-                SwarmEvent::NewListenAddr { .. } => break,
+                SwarmEvent::NewListenAddr(_) => break,
                 _ => {}
             }
         }
@@ -542,7 +542,7 @@ async fn test_global_ips_config() {
             .unwrap();
         loop {
             match client.select_next_some().await {
-                SwarmEvent::NewListenAddr { .. } => break,
+                SwarmEvent::NewListenAddr(_) => break,
                 _ => {}
             }
         }

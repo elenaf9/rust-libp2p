@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 SwarmEvent::Behaviour(Event::Relay(event)) => {
                     println!("{:?}", event)
                 }
-                SwarmEvent::NewListenAddr { address, .. } => {
+                SwarmEvent::NewListenAddr( address ) => {
                     println!("Listening on {:?}", address);
                 }
                 _ => {}
