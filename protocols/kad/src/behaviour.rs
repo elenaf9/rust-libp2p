@@ -39,9 +39,7 @@ use crate::record::{
 use crate::K_VALUE;
 use fnv::{FnvHashMap, FnvHashSet};
 use instant::Instant;
-use libp2p_core::{
-    connection::ConnectionId, transport::ListenerId, ConnectedPoint, Multiaddr, PeerId,
-};
+use libp2p_core::{connection::ConnectionId, ConnectedPoint, Multiaddr, PeerId};
 use libp2p_swarm::{
     dial_opts::{self, DialOpts},
     DialError, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler, PollParameters,
@@ -2224,11 +2222,11 @@ where
         };
     }
 
-    fn inject_new_listen_addr(&mut self, _id: ListenerId, addr: &Multiaddr) {
+    fn inject_new_listen_addr(&mut self, addr: &Multiaddr) {
         self.local_addrs.insert(addr.clone());
     }
 
-    fn inject_expired_listen_addr(&mut self, _id: ListenerId, addr: &Multiaddr) {
+    fn inject_expired_listen_addr(&mut self, addr: &Multiaddr) {
         self.local_addrs.remove(addr);
     }
 

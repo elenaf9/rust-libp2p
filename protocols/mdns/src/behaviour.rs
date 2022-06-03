@@ -25,7 +25,6 @@ use crate::MdnsConfig;
 use async_io::Timer;
 use futures::prelude::*;
 use if_watch::{IfEvent, IfWatcher};
-use libp2p_core::transport::ListenerId;
 use libp2p_core::{Multiaddr, PeerId};
 use libp2p_swarm::{
     handler::DummyConnectionHandler, ConnectionHandler, NetworkBehaviour, NetworkBehaviourAction,
@@ -120,7 +119,7 @@ impl NetworkBehaviour for Mdns {
         void::unreachable(ev)
     }
 
-    fn inject_new_listen_addr(&mut self, _id: ListenerId, _addr: &Multiaddr) {
+    fn inject_new_listen_addr(&mut self, _addr: &Multiaddr) {
         log::trace!("waking interface state because listening address changed");
         for iface in self.iface_states.values_mut() {
             iface.fire_timer();

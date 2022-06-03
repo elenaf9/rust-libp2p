@@ -57,7 +57,6 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
     let connection_id = quote! {::libp2p::core::connection::ConnectionId};
     let dial_errors = quote! {Option<&Vec<::libp2p::core::Multiaddr>>};
     let connected_point = quote! {::libp2p::core::ConnectedPoint};
-    let listener_id = quote! {::libp2p::core::transport::ListenerId};
     let dial_error = quote! {::libp2p::swarm::DialError};
 
     let poll_parameters = quote! {::libp2p::swarm::PollParameters};
@@ -272,25 +271,14 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
             })
     };
 
-    // Build the list of statements to put in the body of `inject_new_listener()`.
-    let inject_new_listener_stmts = {
-        data_struct_fields
-            .iter()
-            .enumerate()
-            .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote! { self.#i.inject_new_listener(id); },
-                None => quote! { self.#field_n.inject_new_listener(id); },
-            })
-    };
-
     // Build the list of statements to put in the body of `inject_new_listen_addr()`.
     let inject_new_listen_addr_stmts = {
         data_struct_fields
             .iter()
             .enumerate()
             .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote! { self.#i.inject_new_listen_addr(id, addr); },
-                None => quote! { self.#field_n.inject_new_listen_addr(id, addr); },
+                Some(ref i) => quote! { self.#i.inject_new_listen_addr(addr); },
+                None => quote! { self.#field_n.inject_new_listen_addr(addr); },
             })
     };
 
@@ -300,8 +288,8 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
             .iter()
             .enumerate()
             .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote! { self.#i.inject_expired_listen_addr(id, addr); },
-                None => quote! { self.#field_n.inject_expired_listen_addr(id, addr); },
+                Some(ref i) => quote! { self.#i.inject_expired_listen_addr(addr); },
+                None => quote! { self.#field_n.inject_expired_listen_addr(addr); },
             })
     };
 
@@ -333,8 +321,8 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
             .iter()
             .enumerate()
             .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote!(self.#i.inject_listener_error(id, err);),
-                None => quote!(self.#field_n.inject_listener_error(id, err);),
+                Some(ref i) => quote!(self.#i.inject_listener_error(err);),
+                None => quote!(self.#field_n.inject_listener_error(err);),
             })
     };
 
@@ -344,8 +332,8 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
             .iter()
             .enumerate()
             .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote!(self.#i.inject_listener_closed(id, reason);),
-                None => quote!(self.#field_n.inject_listener_closed(id, reason);),
+                Some(ref i) => quote!(self.#i.inject_listener_closed(reason);),
+                None => quote!(self.#field_n.inject_listener_closed(reason);),
             })
     };
 
@@ -564,15 +552,11 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
                 #(#inject_listen_failure_stmts);*
             }
 
-            fn inject_new_listener(&mut self, id: #listener_id) {
-                #(#inject_new_listener_stmts);*
-            }
-
-            fn inject_new_listen_addr(&mut self, id: #listener_id, addr: &#multiaddr) {
+            fn inject_new_listen_addr(&mut self, addr: &#multiaddr) {
                 #(#inject_new_listen_addr_stmts);*
             }
 
-            fn inject_expired_listen_addr(&mut self, id: #listener_id, addr: &#multiaddr) {
+            fn inject_expired_listen_addr(&mut self, addr: &#multiaddr) {
                 #(#inject_expired_listen_addr_stmts);*
             }
 
@@ -584,11 +568,11 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
                 #(#inject_expired_external_addr_stmts);*
             }
 
-            fn inject_listener_error(&mut self, id: #listener_id, err: &(dyn std::error::Error + 'static)) {
+            fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
                 #(#inject_listener_error_stmts);*
             }
 
-            fn inject_listener_closed(&mut self, id: #listener_id, reason: std::result::Result<(), &std::io::Error>) {
+            fn inject_listener_closed(&mut self, reason: std::result::Result<(), &std::io::Error>) {
                 #(#inject_listener_closed_stmts);*
             }
 

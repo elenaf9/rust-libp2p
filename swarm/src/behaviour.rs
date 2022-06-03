@@ -24,9 +24,7 @@ pub mod toggle;
 use crate::dial_opts::DialOpts;
 use crate::handler::{ConnectionHandler, IntoConnectionHandler};
 use crate::{AddressRecord, AddressScore, DialError};
-use libp2p_core::{
-    connection::ConnectionId, transport::ListenerId, ConnectedPoint, Multiaddr, PeerId,
-};
+use libp2p_core::{connection::ConnectionId, ConnectedPoint, Multiaddr, PeerId};
 use std::{task::Context, task::Poll};
 
 /// Custom event that can be received by the [`ConnectionHandler`].
@@ -274,22 +272,18 @@ pub trait NetworkBehaviour: 'static {
     ) {
     }
 
-    /// Indicates to the behaviour that a new listener was created.
-    fn inject_new_listener(&mut self, _id: ListenerId) {}
-
     /// Indicates to the behaviour that we have started listening on a new multiaddr.
-    fn inject_new_listen_addr(&mut self, _id: ListenerId, _addr: &Multiaddr) {}
+    fn inject_new_listen_addr(&mut self, _addr: &Multiaddr) {}
 
     /// Indicates to the behaviour that a multiaddr we were listening on has expired,
     /// which means that we are no longer listening in it.
-    fn inject_expired_listen_addr(&mut self, _id: ListenerId, _addr: &Multiaddr) {}
+    fn inject_expired_listen_addr(&mut self, _addr: &Multiaddr) {}
 
     /// A listener experienced an error.
-    fn inject_listener_error(&mut self, _id: ListenerId, _err: &(dyn std::error::Error + 'static)) {
-    }
+    fn inject_listener_error(&mut self, _err: &(dyn std::error::Error + 'static)) {}
 
     /// A listener closed.
-    fn inject_listener_closed(&mut self, _id: ListenerId, _reason: Result<(), &std::io::Error>) {}
+    fn inject_listener_closed(&mut self, _reason: Result<(), &std::io::Error>) {}
 
     /// Indicates to the behaviour that we have discovered a new external address for us.
     fn inject_new_external_addr(&mut self, _addr: &Multiaddr) {}

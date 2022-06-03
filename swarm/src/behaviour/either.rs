@@ -24,9 +24,7 @@ use crate::{
     PollParameters,
 };
 use either::Either;
-use libp2p_core::{
-    connection::ConnectionId, transport::ListenerId, ConnectedPoint, Multiaddr, PeerId,
-};
+use libp2p_core::{connection::ConnectionId, ConnectedPoint, Multiaddr, PeerId};
 use std::{task::Context, task::Poll};
 
 /// Implementation of [`NetworkBehaviour`] that can be either of two implementations.
@@ -170,24 +168,17 @@ where
         }
     }
 
-    fn inject_new_listener(&mut self, id: ListenerId) {
+    fn inject_new_listen_addr(&mut self, addr: &Multiaddr) {
         match self {
-            Either::Left(a) => a.inject_new_listener(id),
-            Either::Right(b) => b.inject_new_listener(id),
+            Either::Left(a) => a.inject_new_listen_addr(addr),
+            Either::Right(b) => b.inject_new_listen_addr(addr),
         }
     }
 
-    fn inject_new_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
+    fn inject_expired_listen_addr(&mut self, addr: &Multiaddr) {
         match self {
-            Either::Left(a) => a.inject_new_listen_addr(id, addr),
-            Either::Right(b) => b.inject_new_listen_addr(id, addr),
-        }
-    }
-
-    fn inject_expired_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
-        match self {
-            Either::Left(a) => a.inject_expired_listen_addr(id, addr),
-            Either::Right(b) => b.inject_expired_listen_addr(id, addr),
+            Either::Left(a) => a.inject_expired_listen_addr(addr),
+            Either::Right(b) => b.inject_expired_listen_addr(addr),
         }
     }
 
@@ -205,17 +196,17 @@ where
         }
     }
 
-    fn inject_listener_error(&mut self, id: ListenerId, err: &(dyn std::error::Error + 'static)) {
+    fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
         match self {
-            Either::Left(a) => a.inject_listener_error(id, err),
-            Either::Right(b) => b.inject_listener_error(id, err),
+            Either::Left(a) => a.inject_listener_error(err),
+            Either::Right(b) => b.inject_listener_error(err),
         }
     }
 
-    fn inject_listener_closed(&mut self, id: ListenerId, reason: Result<(), &std::io::Error>) {
+    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
         match self {
-            Either::Left(a) => a.inject_listener_closed(id, reason),
-            Either::Right(b) => b.inject_listener_closed(id, reason),
+            Either::Left(a) => a.inject_listener_closed(reason),
+            Either::Right(b) => b.inject_listener_closed(reason),
         }
     }
 

@@ -22,8 +22,7 @@ use crate::handler::{IdentifyHandler, IdentifyHandlerEvent, IdentifyPush};
 use crate::protocol::{IdentifyInfo, ReplySubstream, UpgradeError};
 use futures::prelude::*;
 use libp2p_core::{
-    connection::ConnectionId, multiaddr::Protocol, transport::ListenerId, ConnectedPoint,
-    Multiaddr, PeerId, PublicKey,
+    connection::ConnectionId, multiaddr::Protocol, ConnectedPoint, Multiaddr, PeerId, PublicKey,
 };
 use libp2p_swarm::{
     dial_opts::{self, DialOpts},
@@ -279,13 +278,13 @@ impl NetworkBehaviour for Identify {
         }
     }
 
-    fn inject_new_listen_addr(&mut self, _id: ListenerId, _addr: &Multiaddr) {
+    fn inject_new_listen_addr(&mut self, _addr: &Multiaddr) {
         if self.config.push_listen_addr_updates {
             self.pending_push.extend(self.connected.keys());
         }
     }
 
-    fn inject_expired_listen_addr(&mut self, _id: ListenerId, _addr: &Multiaddr) {
+    fn inject_expired_listen_addr(&mut self, _addr: &Multiaddr) {
         if self.config.push_listen_addr_updates {
             self.pending_push.extend(self.connected.keys());
         }

@@ -29,8 +29,7 @@ pub use as_server::{InboundProbeError, InboundProbeEvent};
 use futures_timer::Delay;
 use instant::Instant;
 use libp2p_core::{
-    connection::ConnectionId, multiaddr::Protocol, transport::ListenerId, ConnectedPoint, Endpoint,
-    Multiaddr, PeerId,
+    connection::ConnectionId, multiaddr::Protocol, ConnectedPoint, Endpoint, Multiaddr, PeerId,
 };
 use libp2p_request_response::{
     handler::RequestResponseHandlerEvent, ProtocolSupport, RequestId, RequestResponse,
@@ -405,13 +404,13 @@ impl NetworkBehaviour for Behaviour {
         connections.insert(*conn, observed_addr);
     }
 
-    fn inject_new_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
-        self.inner.inject_new_listen_addr(id, addr);
+    fn inject_new_listen_addr(&mut self, addr: &Multiaddr) {
+        self.inner.inject_new_listen_addr(addr);
         self.as_client().on_new_address();
     }
 
-    fn inject_expired_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
-        self.inner.inject_expired_listen_addr(id, addr);
+    fn inject_expired_listen_addr(&mut self, addr: &Multiaddr) {
+        self.inner.inject_expired_listen_addr(addr);
         self.as_client().on_expired_address(addr);
     }
 
@@ -497,16 +496,12 @@ impl NetworkBehaviour for Behaviour {
             .inject_listen_failure(local_addr, send_back_addr, handler)
     }
 
-    fn inject_new_listener(&mut self, id: ListenerId) {
-        self.inner.inject_new_listener(id)
+    fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
+        self.inner.inject_listener_error(err)
     }
 
-    fn inject_listener_error(&mut self, id: ListenerId, err: &(dyn std::error::Error + 'static)) {
-        self.inner.inject_listener_error(id, err)
-    }
-
-    fn inject_listener_closed(&mut self, id: ListenerId, reason: Result<(), &std::io::Error>) {
-        self.inner.inject_listener_closed(id, reason)
+    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
+        self.inner.inject_listener_closed(reason)
     }
 }
 

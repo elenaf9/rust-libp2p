@@ -327,7 +327,6 @@ where
     /// Depending on the underlying transport, one listener may have multiple listening addresses.
     pub fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<io::Error>> {
         let id = self.transport.listen_on(addr)?;
-        self.behaviour.inject_new_listener(id);
         Ok(id)
     }
 
@@ -872,8 +871,7 @@ where
                 if !addrs.contains(&listen_addr) {
                     addrs.push(listen_addr.clone())
                 }
-                self.behaviour
-                    .inject_new_listen_addr(listener_id, &listen_addr);
+                self.behaviour.inject_new_listen_addr(&listen_addr);
                 return Some(SwarmEvent::NewListenAddr {
                     listener_id,
                     address: listen_addr,
@@ -891,8 +889,7 @@ where
                 if let Some(addrs) = self.listened_addrs.get_mut(&listener_id) {
                     addrs.retain(|a| a != &listen_addr);
                 }
-                self.behaviour
-                    .inject_expired_listen_addr(listener_id, &listen_addr);
+                self.behaviour.inject_expired_listen_addr(&listen_addr);
                 return Some(SwarmEvent::ExpiredListenAddr {
                     listener_id,
                     address: listen_addr,
@@ -905,15 +902,12 @@ where
                 log::debug!("Listener {:?}; Closed by {:?}.", listener_id, reason);
                 let addrs = self.listened_addrs.remove(&listener_id).unwrap_or_default();
                 for addr in addrs.iter() {
-                    self.behaviour.inject_expired_listen_addr(listener_id, addr);
+                    self.behaviour.inject_expired_listen_addr(addr);
                 }
-                self.behaviour.inject_listener_closed(
-                    listener_id,
-                    match &reason {
-                        Ok(()) => Ok(()),
-                        Err(err) => Err(err),
-                    },
-                );
+                self.behaviour.inject_listener_closed(match &reason {
+                    Ok(()) => Ok(()),
+                    Err(err) => Err(err),
+                });
                 return Some(SwarmEvent::ListenerClosed {
                     listener_id,
                     addresses: addrs.to_vec(),
@@ -921,7 +915,7 @@ where
                 });
             }
             TransportEvent::Error { listener_id, error } => {
-                self.behaviour.inject_listener_error(listener_id, &error);
+                self.behaviour.inject_listener_error(&error);
                 return Some(SwarmEvent::ListenerError { listener_id, error });
             }
         }

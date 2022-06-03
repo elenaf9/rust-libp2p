@@ -31,7 +31,6 @@ use either::Either;
 use libp2p_core::{
     connection::ConnectionId,
     either::{EitherError, EitherOutput},
-    transport::ListenerId,
     upgrade::{DeniedUpgrade, EitherUpgrade},
     ConnectedPoint, Multiaddr, PeerId,
 };
@@ -176,21 +175,15 @@ where
         }
     }
 
-    fn inject_new_listener(&mut self, id: ListenerId) {
+    fn inject_new_listen_addr(&mut self, addr: &Multiaddr) {
         if let Some(inner) = self.inner.as_mut() {
-            inner.inject_new_listener(id)
+            inner.inject_new_listen_addr(addr)
         }
     }
 
-    fn inject_new_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
+    fn inject_expired_listen_addr(&mut self, addr: &Multiaddr) {
         if let Some(inner) = self.inner.as_mut() {
-            inner.inject_new_listen_addr(id, addr)
-        }
-    }
-
-    fn inject_expired_listen_addr(&mut self, id: ListenerId, addr: &Multiaddr) {
-        if let Some(inner) = self.inner.as_mut() {
-            inner.inject_expired_listen_addr(id, addr)
+            inner.inject_expired_listen_addr(addr)
         }
     }
 
@@ -206,15 +199,15 @@ where
         }
     }
 
-    fn inject_listener_error(&mut self, id: ListenerId, err: &(dyn std::error::Error + 'static)) {
+    fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
         if let Some(inner) = self.inner.as_mut() {
-            inner.inject_listener_error(id, err)
+            inner.inject_listener_error(err)
         }
     }
 
-    fn inject_listener_closed(&mut self, id: ListenerId, reason: Result<(), &std::io::Error>) {
+    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
         if let Some(inner) = self.inner.as_mut() {
-            inner.inject_listener_closed(id, reason)
+            inner.inject_listener_closed(reason)
         }
     }
 
