@@ -264,25 +264,14 @@ impl ListenerId {
 /// listen addresses which have previously been announced via
 /// a `NewAddress` event and which have not been invalidated by
 /// an `AddressExpired` event yet.
+#[derive(Clone, PartialEq)]
 pub enum TransportEvent<TUpgr, TErr> {
     /// A new address is being listened on.
-    NewAddress {
-        /// The listener that is listening on the new address.
-        listener_id: ListenerId,
-        /// The new address that is being listened on.
-        listen_addr: Multiaddr,
-    },
+    NewAddress(Multiaddr),
     /// An address is no longer being listened on.
-    AddressExpired {
-        /// The listener that is no longer listening on the address.
-        listener_id: ListenerId,
-        /// The new address that is being listened on.
-        listen_addr: Multiaddr,
-    },
-    /// A connection is incoming on one of the listeners.
+    AddressExpired(Multiaddr),
+    /// A connection is incomings.
     Incoming {
-        /// The listener that produced the upgrade.
-        listener_id: ListenerId,
         /// The produced upgrade.
         upgrade: TUpgr,
         /// Local connection address.
@@ -292,19 +281,15 @@ pub enum TransportEvent<TUpgr, TErr> {
     },
     /// A listener closed.
     ListenerClosed {
-        /// The ID of the listener that closed.
-        listener_id: ListenerId,
         /// Reason for the closure. Contains `Ok(())` if the stream produced `None`, or `Err`
         /// if the stream produced an error.
         reason: Result<(), TErr>,
     },
-    /// A listener errored.
+    /// A transport error occured.
     ///
-    /// The listener will continue to be polled for new events and the event
+    /// The transport will continue to be polled for new events and the event
     /// is for informational purposes only.
     Error {
-        /// The ID of the listener that errored.
-        listener_id: ListenerId,
         /// The error value.
         error: TErr,
     },
@@ -314,121 +299,39 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
     pub fn map_upgrade<U>(self, map: impl FnOnce(TUpgr) -> U) -> TransportEvent<U, TErr> {
         match self {
             TransportEvent::Incoming {
-                listener_id,
                 upgrade,
                 local_addr,
                 send_back_addr,
             } => TransportEvent::Incoming {
-                listener_id,
                 upgrade: map(upgrade),
                 local_addr,
                 send_back_addr,
             },
-            TransportEvent::NewAddress {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::NewAddress {
-                listen_addr,
-                listener_id,
-            },
-            TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id,
-            },
-            TransportEvent::Error { listener_id, error } => {
-                TransportEvent::Error { listener_id, error }
-            }
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            },
+            TransportEvent::NewAddress(addr) => TransportEvent::NewAddress(addr),
+            TransportEvent::AddressExpired(addr) => TransportEvent::AddressExpired(addr),
+            TransportEvent::Error { error } => TransportEvent::Error { error },
+            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed { reason },
         }
     }
 
     pub fn map_err<E>(self, map_err: impl FnOnce(TErr) -> E) -> TransportEvent<TUpgr, E> {
         match self {
             TransportEvent::Incoming {
-                listener_id,
                 upgrade,
                 local_addr,
                 send_back_addr,
             } => TransportEvent::Incoming {
-                listener_id,
                 upgrade,
                 local_addr,
                 send_back_addr,
             },
-            TransportEvent::NewAddress {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::NewAddress {
-                listen_addr,
-                listener_id,
-            },
-            TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id,
-            },
-            TransportEvent::Error { listener_id, error } => TransportEvent::Error {
-                listener_id,
+            TransportEvent::NewAddress(addr) => TransportEvent::NewAddress(addr),
+            TransportEvent::AddressExpired(addr) => TransportEvent::AddressExpired(addr),
+            TransportEvent::Error { error } => TransportEvent::Error {
                 error: map_err(error),
             },
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => TransportEvent::ListenerClosed {
-                listener_id,
+            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed {
                 reason: reason.map_err(map_err),
-            },
-        }
-    }
-
-    pub fn map_transport_type<T: Any>(self) -> Self {
-        match self {
-            TransportEvent::Incoming {
-                listener_id,
-                upgrade,
-                local_addr,
-                send_back_addr,
-            } => TransportEvent::Incoming {
-                listener_id: listener_id.map_type::<T>(),
-                upgrade,
-                local_addr,
-                send_back_addr,
-            },
-            TransportEvent::NewAddress {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::NewAddress {
-                listen_addr,
-                listener_id: listener_id.map_type::<T>(),
-            },
-            TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id,
-            } => TransportEvent::AddressExpired {
-                listen_addr,
-                listener_id: listener_id.map_type::<T>(),
-            },
-            TransportEvent::Error { listener_id, error } => TransportEvent::Error {
-                listener_id: listener_id.map_type::<T>(),
-                error,
-            },
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => TransportEvent::ListenerClosed {
-                listener_id: listener_id.map_type::<T>(),
-                reason,
             },
         }
     }
@@ -457,7 +360,7 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
 
     /// Returns `true` if this is a `NewAddress` listener event.
     pub fn is_new_address(&self) -> bool {
-        matches!(self, TransportEvent::NewAddress { .. })
+        matches!(self, TransportEvent::NewAddress(_))
     }
 
     /// Try to turn this listener event into the `NewAddress` part.
@@ -465,8 +368,8 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
     /// Returns `None` if the event is not actually a `NewAddress`,
     /// otherwise the address.
     pub fn into_new_address(self) -> Option<Multiaddr> {
-        if let TransportEvent::NewAddress { listen_addr, .. } = self {
-            Some(listen_addr)
+        if let TransportEvent::NewAddress(a) = self {
+            Some(a)
         } else {
             None
         }
@@ -474,7 +377,7 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
 
     /// Returns `true` if this is an `AddressExpired` listener event.
     pub fn is_address_expired(&self) -> bool {
-        matches!(self, TransportEvent::AddressExpired { .. })
+        matches!(self, TransportEvent::AddressExpired(_))
     }
 
     /// Try to turn this listener event into the `AddressExpired` part.
@@ -482,8 +385,8 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
     /// Returns `None` if the event is not actually a `AddressExpired`,
     /// otherwise the address.
     pub fn into_address_expired(self) -> Option<Multiaddr> {
-        if let TransportEvent::AddressExpired { listen_addr, .. } = self {
-            Some(listen_addr)
+        if let TransportEvent::AddressExpired(a) = self {
+            Some(a)
         } else {
             None
         }
@@ -499,7 +402,7 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
     /// Returns `None` if the event is not actually a `Error`,
     /// otherwise the error.
     pub fn into_error(self) -> Option<TErr> {
-        if let TransportEvent::Error { error, .. } = self {
+        if let TransportEvent::Error { error } = self {
             Some(error)
         } else {
             None
@@ -510,42 +413,24 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
 impl<TUpgr, TErr: fmt::Debug> fmt::Debug for TransportEvent<TUpgr, TErr> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            TransportEvent::NewAddress {
-                listener_id,
-                listen_addr,
-            } => f
-                .debug_struct("TransportEvent::NewAddress")
-                .field("listener_id", listener_id)
-                .field("listen_addr", listen_addr)
+            TransportEvent::NewAddress(addr) => f
+                .debug_tuple("TransportEvent::NewAddress")
+                .field(&addr)
                 .finish(),
-            TransportEvent::AddressExpired {
-                listener_id,
-                listen_addr,
-            } => f
-                .debug_struct("TransportEvent::AddressExpired")
-                .field("listener_id", listener_id)
-                .field("listen_addr", listen_addr)
+            TransportEvent::AddressExpired(addr) => f
+                .debug_tuple("TransportEvent::AddressExpired")
+                .field(&addr)
                 .finish(),
-            TransportEvent::Incoming {
-                listener_id,
-                local_addr,
-                ..
-            } => f
+            TransportEvent::Incoming { local_addr, .. } => f
                 .debug_struct("TransportEvent::Incoming")
-                .field("listener_id", listener_id)
                 .field("local_addr", local_addr)
                 .finish(),
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => f
+            TransportEvent::ListenerClosed { reason } => f
                 .debug_struct("TransportEvent::Closed")
-                .field("listener_id", listener_id)
                 .field("reason", reason)
                 .finish(),
-            TransportEvent::Error { listener_id, error } => f
+            TransportEvent::Error { error } => f
                 .debug_struct("TransportEvent::Error")
-                .field("listener_id", listener_id)
                 .field("error", error)
                 .finish(),
         }

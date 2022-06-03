@@ -103,10 +103,7 @@ macro_rules! codegen {
                                 let addr = addr.clone();
                                 async move {
                                     debug!("Now listening on {}", addr);
-                                    Ok(TransportEvent::NewAddress {
-                                        listener_id: id,
-                                        listen_addr: addr,
-                                    })
+                                    Ok(TransportEvent::NewAddress(addr))
                                 }
                             })
                             .chain(stream::unfold(
@@ -121,13 +118,9 @@ macro_rules! codegen {
                                                     upgrade: future::ok(stream),
                                                     local_addr: addr.clone(),
                                                     send_back_addr: addr.clone(),
-                                                    listener_id: id,
                                                 }
                                             }
-                                            Err(error) => TransportEvent::Error {
-                                                listener_id: id,
-                                                error,
-                                            },
+                                            Err(error) => TransportEvent::Error { error },
                                         };
                                         Some((Ok(event), listener))
                                     }
@@ -194,10 +187,7 @@ macro_rules! codegen {
                         Poll::Ready(None) => panic!("Alive listeners always have a sender."),
                         Poll::Ready(Some(Ok(event))) => Some(event),
                         Poll::Ready(Some(Err(reason))) => {
-                            return Poll::Ready(TransportEvent::ListenerClosed {
-                                listener_id: id,
-                                reason,
-                            })
+                            return Poll::Ready(TransportEvent::ListenerClosed { reason })
                         }
                     };
                     self.listeners.push_front((id, listener));

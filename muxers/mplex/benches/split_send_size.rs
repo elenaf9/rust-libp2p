@@ -108,8 +108,8 @@ fn run(
     let receiver = async move {
         loop {
             match receiver_trans.next().await.unwrap() {
-                transport::TransportEvent::NewAddress { listen_addr, .. } => {
-                    addr_sender.take().unwrap().send(listen_addr).unwrap();
+                transport::TransportEvent::NewAddress(addr) => {
+                    addr_sender.take().unwrap().send(addr).unwrap();
                 }
                 transport::TransportEvent::Incoming { upgrade, .. } => {
                     let (_peer, conn) = upgrade.await.unwrap();

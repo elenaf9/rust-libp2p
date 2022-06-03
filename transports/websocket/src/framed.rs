@@ -36,7 +36,12 @@ use soketto::{
     extension::deflate::Deflate,
     handshake,
 };
-use std::{collections::HashMap, ops::DerefMut, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    ops::DerefMut,
+    sync::Arc,
+};
 use std::{convert::TryInto, fmt, io, mem, pin::Pin, task::Context, task::Poll};
 use url::Url;
 
@@ -53,7 +58,11 @@ pub struct WsConfig<T> {
     tls_config: tls::Config,
     max_redirects: u8,
     use_deflate: bool,
-    listener_protos: HashMap<ListenerId, Protocol<'static>>,
+    /// Ws / Wss protocols extension for inner listening addresses, mapped to
+    /// the port of the listening address.
+    listener_protos: HashMap<u16, Protocol<'static>>,
+    wildcard_port_protos: HashMap<IpAddr, Protocol<'static>>,
+    wildcard_protos: VecDeque<Protocol<'static>>,
 }
 
 impl<T> WsConfig<T> {
@@ -66,6 +75,8 @@ impl<T> WsConfig<T> {
             max_redirects: 0,
             use_deflate: false,
             listener_protos: HashMap::new(),
+            wildcard_port_protos: HashMap::new(),
+            wildcard_protos: VecDeque::new(),
         }
     }
 
@@ -120,15 +131,18 @@ where
     type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
     fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+        if !self.is_tcp_addr(&addr) {
+            debug!("{} is not a tcp multiaddr", addr);
+            return Err(TransportError::MultiaddrNotSupported(addr));
+        }
         let mut inner_addr = addr.clone();
         let proto = match inner_addr.pop() {
             Some(p @ Protocol::Wss(_)) => {
-                if self.tls_config.server.is_some() {
-                    p
-                } else {
+                if self.tls_config.server.is_none() {
                     debug!("/wss address but TLS server support is not configured");
                     return Err(TransportError::MultiaddrNotSupported(addr));
                 }
+                p
             }
             Some(p @ Protocol::Ws(_)) => p,
             _ => {
@@ -136,14 +150,12 @@ where
                 return Err(TransportError::MultiaddrNotSupported(addr));
             }
         };
-        match self.transport.lock().listen_on(inner_addr) {
-            Ok(id) => {
-                let id = id.map_type::<Self>();
-                self.listener_protos.insert(id, proto);
-                Ok(id)
-            }
-            Err(e) => Err(e.map(Error::Transport)),
-        }
+        let id = match self.transport.lock().listen_on(inner_addr.clone()) {
+            Ok(id) => id,
+            Err(e) => return Err(e.map(Error::Transport)),
+        };
+        self.insert_proto(inner_addr, proto);
+        Ok(id)
     }
 
     fn remove_listener(&mut self, id: ListenerId) -> bool {
@@ -176,62 +188,30 @@ where
         };
         drop(transport);
 
-        let event = match inner_event.map_transport_type::<Self>() {
-            TransportEvent::NewAddress {
-                listener_id,
-                mut listen_addr,
-            } => {
-                let proto = self
-                    .listener_protos
-                    .get(&listener_id)
-                    .expect("Protocol was inserted in Transport::listen_on.");
-                listen_addr.push(proto.clone());
-                debug!("Listening on {}", listen_addr);
-                TransportEvent::NewAddress {
-                    listener_id,
-                    listen_addr,
-                }
+        let event = match inner_event {
+            TransportEvent::NewAddress(mut addr) => {
+                let proto = self.get_proto(&addr);
+                addr.push(proto.clone());
+                debug!("Listening on {}", addr);
+                TransportEvent::NewAddress(addr.clone())
             }
-            TransportEvent::AddressExpired {
-                listener_id,
-                mut listen_addr,
-            } => {
-                let proto = self
-                    .listener_protos
-                    .get(&listener_id)
-                    .expect("Protocol was inserted in Transport::listen_on.");
-                listen_addr.push(proto.clone());
-                TransportEvent::AddressExpired {
-                    listener_id,
-                    listen_addr,
-                }
+            TransportEvent::AddressExpired(mut addr) => {
+                let proto = self.get_proto(&addr);
+                addr.push(proto.clone());
+                TransportEvent::AddressExpired(addr)
             }
-            TransportEvent::Error { listener_id, error } => TransportEvent::Error {
-                listener_id,
+            TransportEvent::Error { error } => TransportEvent::Error {
                 error: Error::Transport(error),
             },
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => {
-                self.listener_protos
-                    .remove(&listener_id)
-                    .expect("Protocol was inserted in Transport::listen_on.");
-                TransportEvent::ListenerClosed {
-                    listener_id,
-                    reason: reason.map_err(Error::Transport),
-                }
-            }
+            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed {
+                reason: reason.map_err(Error::Transport),
+            },
             TransportEvent::Incoming {
-                listener_id,
                 upgrade,
                 mut local_addr,
                 mut send_back_addr,
             } => {
-                let proto = self
-                    .listener_protos
-                    .get(&listener_id)
-                    .expect("Protocol was inserted in Transport::listen_on.");
+                let proto = self.get_proto(&local_addr);
                 let use_tls = match proto {
                     Protocol::Wss(_) => true,
                     Protocol::Ws(_) => false,
@@ -241,7 +221,6 @@ where
                 send_back_addr.push(proto.clone());
                 let upgrade = self.map_upgrade(upgrade, send_back_addr.clone(), use_tls);
                 TransportEvent::Incoming {
-                    listener_id,
                     upgrade,
                     local_addr,
                     send_back_addr,
@@ -307,6 +286,74 @@ where
         };
 
         Ok(Box::pin(future))
+    }
+
+    fn is_tcp_addr(&self, addr: &Multiaddr) -> bool {
+        let mut addr_iter = addr.iter();
+        matches!(
+            addr_iter.next(),
+            Some(Protocol::Ip4(_)) | Some(Protocol::Ip6(_))
+        ) && matches!(addr_iter.next(), Some(Protocol::Tcp(_)))
+            && match addr_iter.next() {
+                Some(Protocol::Wss(_)) if self.tls_config.server.is_none() => {
+                    debug!("/wss address but TLS server support is not configured");
+                    false
+                }
+                Some(Protocol::Wss(_)) | Some(Protocol::Ws(_)) => true,
+                _ => false,
+            }
+    }
+
+    fn insert_proto(&mut self, inner_addr: Multiaddr, proto: Protocol<'static>) {
+        let mut addr_iter = inner_addr.iter();
+        let ip_proto = addr_iter.next().expect("Address is valid.");
+        let port = match addr_iter.next().expect("Address is valid tcp address") {
+            Protocol::Tcp(port) => port,
+            _ => unreachable!("Address is valid tcp address."),
+        };
+        if port != 0 {
+            self.listener_protos.insert(port, proto);
+            return;
+        }
+        match ip_proto {
+            Protocol::Ip4(a) if a != Ipv4Addr::UNSPECIFIED => {
+                self.wildcard_port_protos.insert(a.into(), proto);
+            }
+            Protocol::Ip6(a) if a != Ipv6Addr::UNSPECIFIED => {
+                self.wildcard_port_protos.insert(a.into(), proto);
+            }
+            _ => {
+                // Wildcard address.
+                self.wildcard_protos.push_back(proto);
+            }
+        }
+    }
+
+    fn get_proto(&mut self, inner_address: &Multiaddr) -> Protocol<'static> {
+        let mut addr_iter = inner_address.iter();
+        let ip = addr_iter.next();
+        let port = match addr_iter.next() {
+            Some(Protocol::Tcp(p)) => {
+                if let Some(proto) = self.listener_protos.get(&p) {
+                    return proto.clone();
+                }
+                p
+            }
+            _ => unreachable!("Unsupported Address"),
+        };
+        // Fetch protocol if IP of the original IP address was **not** unspecified.
+        let proto = match ip {
+            Some(Protocol::Ip4(a)) => self.wildcard_port_protos.remove(&IpAddr::V4(a)),
+            Some(Protocol::Ip6(a)) => self.wildcard_port_protos.remove(&IpAddr::V6(a)),
+            _ => unreachable!("Address not supported"),
+        };
+        // Fetch protocol IP and Port of the original address were unspecified.
+        let proto = proto
+            .or_else(|| self.wildcard_protos.pop_front())
+            .expect("Address is supported");
+
+        self.listener_protos.insert(port, proto.clone());
+        proto
     }
 
     /// Attempts to dial the given address and perform a websocket handshake.

@@ -263,29 +263,21 @@ impl Transport for MemoryTransport {
         while let Some(mut listener) = self.listeners.pop_back() {
             if listener.tell_listen_addr {
                 listener.tell_listen_addr = false;
-                let listen_addr = listener.addr.clone();
-                let listener_id = listener.id;
+                let addr = listener.addr.clone();
                 self.listeners.push_front(listener);
-                return Poll::Ready(TransportEvent::NewAddress {
-                    listen_addr,
-                    listener_id,
-                });
+                return Poll::Ready(TransportEvent::NewAddress(addr));
             }
 
             let event = match Stream::poll_next(Pin::new(&mut listener.receiver), cx) {
                 Poll::Pending => None,
                 Poll::Ready(Some((channel, dial_port))) => Some(TransportEvent::Incoming {
-                    listener_id: listener.id,
                     upgrade: future::ready(Ok(channel)),
                     local_addr: listener.addr.clone(),
                     send_back_addr: Protocol::Memory(dial_port.get()).into(),
                 }),
                 Poll::Ready(None) => {
                     // Listener was closed.
-                    return Poll::Ready(TransportEvent::ListenerClosed {
-                        listener_id: listener.id,
-                        reason: Ok(()),
-                    });
+                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Ok(()) });
                 }
             };
 
@@ -515,11 +507,7 @@ mod tests {
             assert_eq!(addr, reported_addr);
             assert!(transport.remove_listener(listener_id));
             match transport.select_next_some().await {
-                TransportEvent::ListenerClosed {
-                    listener_id: id,
-                    reason,
-                } => {
-                    assert_eq!(id, listener_id);
+                TransportEvent::ListenerClosed { reason } => {
                     assert!(reason.is_ok())
                 }
                 other => panic!("Unexpected transport event: {:?}", other),

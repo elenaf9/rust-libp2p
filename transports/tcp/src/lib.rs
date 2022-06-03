@@ -244,8 +244,8 @@ impl GenTcpConfig {
     /// let mut tcp1 = TcpTransport::new(GenTcpConfig::new().port_reuse(true)).boxed();
     /// tcp1.listen_on( listen_addr1.clone()).expect("listener");
     /// match tcp1.select_next_some().await {
-    ///     TransportEvent::NewAddress { listen_addr, .. } => {
-    ///         println!("Listening on {:?}", listen_addr);
+    ///     TransportEvent::NewAddress(addr) => {
+    ///         println!("Listening on {:?}", addr);
     ///         let mut stream = tcp1.dial(listen_addr2.clone()).unwrap().await?;
     ///         // `stream` has `listen_addr1` as its local socket address.
     ///     }
@@ -255,8 +255,8 @@ impl GenTcpConfig {
     /// let mut tcp2 = TcpTransport::new(GenTcpConfig::new().port_reuse(true)).boxed();
     /// tcp2.listen_on( listen_addr2).expect("listener");
     /// match tcp2.select_next_some().await {
-    ///     TransportEvent::NewAddress { listen_addr, .. } => {
-    ///         println!("Listening on {:?}", listen_addr);
+    ///     TransportEvent::NewAddress(addr) => {
+    ///         println!("Listening on {:?}", addr);
     ///         let mut socket = tcp2.dial(listen_addr1).unwrap().await?;
     ///         // `stream` has `listen_addr2` as its local socket address.
     ///     }
@@ -405,10 +405,7 @@ where
         if let Some(index) = self.listeners.iter().position(|l| l.listener_id != id) {
             self.listeners.remove(index);
             self.pending_events
-                .push_back(TransportEvent::ListenerClosed {
-                    listener_id: id,
-                    reason: Ok(()),
-                });
+                .push_back(TransportEvent::ListenerClosed { reason: Ok(()) });
             true
         } else {
             false
@@ -511,50 +508,30 @@ where
                     local_addr,
                     remote_addr,
                 }))) => {
-                    let id = listener.listener_id;
                     self.listeners.push_front(listener);
                     return Poll::Ready(TransportEvent::Incoming {
-                        listener_id: id,
                         upgrade,
                         local_addr,
                         send_back_addr: remote_addr,
                     });
                 }
                 Poll::Ready(Some(Ok(TcpTransportEvent::NewAddress(a)))) => {
-                    let id = listener.listener_id;
                     self.listeners.push_front(listener);
-                    return Poll::Ready(TransportEvent::NewAddress {
-                        listener_id: id,
-                        listen_addr: a,
-                    });
+                    return Poll::Ready(TransportEvent::NewAddress(a));
                 }
                 Poll::Ready(Some(Ok(TcpTransportEvent::AddressExpired(a)))) => {
-                    let id = listener.listener_id;
                     self.listeners.push_front(listener);
-                    return Poll::Ready(TransportEvent::AddressExpired {
-                        listener_id: id,
-                        listen_addr: a,
-                    });
+                    return Poll::Ready(TransportEvent::AddressExpired(a));
                 }
                 Poll::Ready(Some(Ok(TcpTransportEvent::Error(error)))) => {
-                    let id = listener.listener_id;
                     self.listeners.push_front(listener);
-                    return Poll::Ready(TransportEvent::Error {
-                        listener_id: id,
-                        error,
-                    });
+                    return Poll::Ready(TransportEvent::Error { error });
                 }
                 Poll::Ready(None) => {
-                    return Poll::Ready(TransportEvent::ListenerClosed {
-                        listener_id: listener.listener_id,
-                        reason: Ok(()),
-                    });
+                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Ok(()) });
                 }
                 Poll::Ready(Some(Err(err))) => {
-                    return Poll::Ready(TransportEvent::ListenerClosed {
-                        listener_id: listener.listener_id,
-                        reason: Err(err),
-                    });
+                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Err(err) });
                 }
             }
         }
@@ -926,8 +903,8 @@ mod tests {
             tcp.listen_on(addr).unwrap();
             loop {
                 match tcp.select_next_some().await {
-                    TransportEvent::NewAddress { listen_addr, .. } => {
-                        ready_tx.send(listen_addr).await.unwrap();
+                    TransportEvent::NewAddress(addr) => {
+                        ready_tx.send(addr).await.unwrap();
                     }
                     TransportEvent::Incoming { upgrade, .. } => {
                         let mut upgrade = upgrade.await.unwrap();
@@ -996,8 +973,8 @@ mod tests {
 
             loop {
                 match tcp.select_next_some().await {
-                    TransportEvent::NewAddress { listen_addr, .. } => {
-                        let mut iter = listen_addr.iter();
+                    TransportEvent::NewAddress(addr) => {
+                        let mut iter = addr.iter();
                         match iter.next().expect("ip address") {
                             Protocol::Ip4(ip) => assert!(!ip.is_unspecified()),
                             Protocol::Ip6(ip) => assert!(!ip.is_unspecified()),
@@ -1006,9 +983,9 @@ mod tests {
                         if let Protocol::Tcp(port) = iter.next().expect("port") {
                             assert_ne!(0, port)
                         } else {
-                            panic!("No TCP port in address: {}", listen_addr)
+                            panic!("No TCP port in address: {}", addr)
                         }
-                        ready_tx.send(listen_addr).await.ok();
+                        ready_tx.send(addr).await.ok();
                     }
                     TransportEvent::Incoming { .. } => {
                         return;
@@ -1064,8 +1041,8 @@ mod tests {
             tcp.listen_on(addr).unwrap();
             loop {
                 match tcp.select_next_some().await {
-                    TransportEvent::NewAddress { listen_addr, .. } => {
-                        ready_tx.send(listen_addr).await.ok();
+                    TransportEvent::NewAddress(addr) => {
+                        ready_tx.send(addr).await.ok();
                     }
                     TransportEvent::Incoming { upgrade, .. } => {
                         let mut upgrade = upgrade.await.unwrap();
@@ -1085,7 +1062,7 @@ mod tests {
             let mut tcp = GenTcpTransport::<T>::new(GenTcpConfig::new().port_reuse(true)).boxed();
             tcp.listen_on(addr).unwrap();
             match tcp.select_next_some().await {
-                TransportEvent::NewAddress { .. } => {
+                TransportEvent::NewAddress(_) => {
                     // Obtain a future socket through dialing
                     let mut socket = tcp.dial(dest_addr).unwrap().await.unwrap();
                     socket.write_all(&[0x1, 0x2, 0x3]).await.unwrap();
@@ -1143,15 +1120,11 @@ mod tests {
             let mut tcp = GenTcpTransport::<T>::new(GenTcpConfig::new().port_reuse(true)).boxed();
             tcp.listen_on(addr).unwrap();
             match tcp.select_next_some().await {
-                TransportEvent::NewAddress {
-                    listen_addr: addr1, ..
-                } => {
+                TransportEvent::NewAddress(addr1) => {
                     // Listen on the same address a second time.
                     tcp.listen_on(addr1.clone()).unwrap();
                     match tcp.select_next_some().await {
-                        TransportEvent::NewAddress {
-                            listen_addr: addr2, ..
-                        } => {
+                        TransportEvent::NewAddress(addr2) => {
                             assert_eq!(addr1, addr2);
                             return;
                         }

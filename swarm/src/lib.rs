@@ -820,7 +820,6 @@ where
     ) -> Option<SwarmEvent<TBehaviour::OutEvent, THandlerErr<TBehaviour>>> {
         match event {
             TransportEvent::Incoming {
-                listener_id: _,
                 upgrade,
                 local_addr,
                 send_back_addr,
@@ -847,35 +846,22 @@ where
                     }
                 };
             }
-            TransportEvent::NewAddress {
-                listener_id,
-                listen_addr,
-            } => {
-                log::debug!("Listener {:?}; New address: {:?}", listener_id, listen_addr);
-                if !self.listened_addrs.contains(&listen_addr) {
-                    self.listened_addrs.push(listen_addr.clone())
+            TransportEvent::NewAddress(addr) => {
+                log::debug!("New address: {:?}", addr);
+                if !self.listened_addrs.contains(&addr) {
+                    self.listened_addrs.push(addr.clone())
                 }
-                self.behaviour.inject_new_listen_addr(&listen_addr);
-                return Some(SwarmEvent::NewListenAddr(listen_addr));
+                self.behaviour.inject_new_listen_addr(&addr);
+                return Some(SwarmEvent::NewListenAddr(addr));
             }
-            TransportEvent::AddressExpired {
-                listener_id,
-                listen_addr,
-            } => {
-                log::debug!(
-                    "Listener {:?}; Expired address {:?}.",
-                    listener_id,
-                    listen_addr
-                );
-                self.listened_addrs.retain(|a| a != &listen_addr);
-                self.behaviour.inject_expired_listen_addr(&listen_addr);
-                return Some(SwarmEvent::ExpiredListenAddr(listen_addr));
+            TransportEvent::AddressExpired(addr) => {
+                log::debug!("Expired address {:?}.", addr);
+                self.listened_addrs.retain(|a| a != &addr);
+                self.behaviour.inject_expired_listen_addr(&addr);
+                return Some(SwarmEvent::ExpiredListenAddr(addr));
             }
-            TransportEvent::ListenerClosed {
-                listener_id,
-                reason,
-            } => {
-                log::debug!("Listener {:?}; Closed by {:?}.", listener_id, reason);
+            TransportEvent::ListenerClosed { reason } => {
+                log::debug!("Listener closed by {:?}.", reason);
                 self.behaviour.inject_listener_closed(match &reason {
                     Ok(()) => Ok(()),
                     Err(err) => Err(err),
@@ -2033,8 +2019,8 @@ mod tests {
                     transport.listen_on("/memory/0".parse().unwrap()).unwrap();
 
                     match transport.select_next_some().await {
-                        TransportEvent::NewAddress { listen_addr, .. } => {
-                            listen_addresses.push(listen_addr);
+                        TransportEvent::NewAddress(addr) => {
+                            listen_addresses.push(addr);
                         }
                         _ => panic!("Expected `NewListenAddr` event."),
                     }

@@ -116,7 +116,6 @@ where
         let this = self.project();
         match this.transport.poll(cx) {
             Poll::Ready(TransportEvent::Incoming {
-                listener_id,
                 upgrade,
                 local_addr,
                 send_back_addr,
@@ -126,7 +125,6 @@ where
                     send_back_addr: send_back_addr.clone(),
                 };
                 Poll::Ready(TransportEvent::Incoming {
-                    listener_id,
                     upgrade: AndThenFuture {
                         inner: Either::Left(Box::pin(upgrade)),
                         args: Some((this.fun.clone(), point)),
