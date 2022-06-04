@@ -26,8 +26,6 @@ use futures::prelude::*;
 use multiaddr::Multiaddr;
 use std::{pin::Pin, task::Context, task::Poll};
 
-use super::ListenerId;
-
 /// See `Transport::map`.
 #[derive(Debug, Copy, Clone)]
 #[pin_project::pin_project]
@@ -61,12 +59,12 @@ where
     type ListenerUpgrade = MapFuture<T::ListenerUpgrade, F>;
     type Dial = MapFuture<T::Dial, F>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.transport.listen_on(addr)
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.transport.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

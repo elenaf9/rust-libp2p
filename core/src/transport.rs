@@ -115,7 +115,7 @@ pub trait Transport {
     ///
     /// Returning an error from the stream is considered fatal. The listener can also report
     /// non-fatal errors by producing a [`TransportEvent::Error`].
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>>
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>>
     where
         Self: Sized;
 
@@ -123,7 +123,7 @@ pub trait Transport {
     ///
     /// Return `true` if there was a listener with this Id, `false`
     /// otherwise.
-    fn remove_listener(&mut self, id: ListenerId) -> bool;
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool;
 
     /// Dials the given [`Multiaddr`], returning a future for a pending outbound connection.
     ///
@@ -237,7 +237,7 @@ pub struct ListenerId {
 }
 
 impl ListenerId {
-    /// Creates a new `ListenerId`.
+    /// Creates a new `ListListenerIdenerId`.
     pub fn new<T: Any>(id: u64) -> Self {
         Self {
             id,

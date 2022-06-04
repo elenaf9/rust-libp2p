@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::transport::{ListenerId, Transport, TransportError, TransportEvent};
+use crate::transport::{Transport, TransportError, TransportEvent};
 use crate::Multiaddr;
 use futures::{prelude::*, task::Context, task::Poll};
 use std::{fmt, io, marker::PhantomData, pin::Pin};
@@ -59,11 +59,11 @@ impl<TOut> Transport for DummyTransport<TOut> {
     type ListenerUpgrade = futures::future::Pending<Result<Self::Output, io::Error>>;
     type Dial = futures::future::Pending<Result<Self::Output, io::Error>>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         Err(TransportError::MultiaddrNotSupported(addr))
     }
 
-    fn remove_listener(&mut self, _id: ListenerId) -> bool {
+    fn remove_listener(&mut self, _addr: &Multiaddr) -> bool {
         false
     }
 

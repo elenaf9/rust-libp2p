@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::either::{EitherError, EitherFuture, EitherOutput};
-use crate::transport::{ListenerId, Transport, TransportError, TransportEvent};
+use crate::transport::{Transport, TransportError, TransportEvent};
 use multiaddr::Multiaddr;
 use std::{pin::Pin, task::Context, task::Poll};
 
@@ -44,7 +44,7 @@ where
     type ListenerUpgrade = EitherFuture<A::ListenerUpgrade, B::ListenerUpgrade>;
     type Dial = EitherFuture<A::Dial, B::Dial>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         let addr = match self.0.listen_on(addr) {
             Err(TransportError::MultiaddrNotSupported(addr)) => addr,
             res => return res.map_err(|err| err.map(EitherError::A)),
@@ -58,8 +58,8 @@ where
         Err(TransportError::MultiaddrNotSupported(addr))
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.0.remove_listener(id) || self.1.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.0.remove_listener(addr) || self.1.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

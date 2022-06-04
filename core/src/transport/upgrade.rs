@@ -26,8 +26,8 @@ use crate::{
     connection::ConnectedPoint,
     muxing::{StreamMuxer, StreamMuxerBox},
     transport::{
-        and_then::AndThen, boxed::boxed, timeout::TransportTimeout, ListenerId, Transport,
-        TransportError, TransportEvent,
+        and_then::AndThen, boxed::boxed, timeout::TransportTimeout, Transport, TransportError,
+        TransportEvent,
     },
     upgrade::{
         self, apply_inbound, apply_outbound, InboundUpgrade, InboundUpgradeApply, OutboundUpgrade,
@@ -338,8 +338,8 @@ where
         self.0.dial(addr)
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.0.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.0.remove_listener(addr)
     }
 
     fn dial_as_listener(
@@ -349,7 +349,7 @@ where
         self.0.dial_as_listener(addr)
     }
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.0.listen_on(addr)
     }
 
@@ -410,8 +410,8 @@ where
         })
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.inner.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.remove_listener(addr)
     }
 
     fn dial_as_listener(
@@ -428,7 +428,7 @@ where
         })
     }
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.inner
             .listen_on(addr)
             .map_err(|err| err.map(TransportUpgradeError::Transport))

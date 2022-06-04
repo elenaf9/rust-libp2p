@@ -31,7 +31,6 @@ use futures::{
     prelude::*,
     ready,
 };
-use libp2p_core::transport::ListenerId;
 use std::{
     convert::TryFrom as _,
     io,
@@ -96,12 +95,12 @@ where
         }
     }
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.inner.listen_on(addr)
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.inner.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

@@ -51,7 +51,7 @@ use futures_timer::Delay;
 use libp2p_core::{
     address_translation,
     multiaddr::{Multiaddr, Protocol},
-    transport::{ListenerId, Transport, TransportError, TransportEvent},
+    transport::{Transport, TransportError, TransportEvent},
 };
 use socket2::{Domain, Socket, Type};
 use std::{
@@ -230,7 +230,7 @@ impl GenTcpConfig {
     ///
     /// ```no_run
     /// # use futures::StreamExt;
-    /// # use libp2p_core::transport::{ListenerId, TransportEvent};
+    /// # use libp2p_core::transport::{TransportEvent};
     /// # use libp2p_core::{Multiaddr, Transport};
     /// # use std::pin::Pin;
     /// #[cfg(feature = "async-io")]
@@ -303,7 +303,6 @@ where
 {
     config: GenTcpConfig,
 
-    next_listener_id: ListenerId,
     /// All the active listeners.
     /// The `Listener` struct contains a stream that we want to be pinned. Since the `VecDeque`
     /// can be resized, the only way is to use a `Pin<Box<>>`.
@@ -347,16 +346,12 @@ where
         Ok(socket)
     }
 
-    fn do_listen(
-        &mut self,
-        id: ListenerId,
-        socket_addr: SocketAddr,
-    ) -> io::Result<TcpListenStream<T>> {
+    fn do_listen(&mut self, socket_addr: SocketAddr) -> io::Result<TcpListenStream<T>> {
         let socket = self.create_socket(&socket_addr)?;
         socket.bind(&socket_addr.into())?;
         socket.listen(self.config.backlog as _)?;
         socket.set_nonblocking(true)?;
-        TcpListenStream::<T>::new(id, socket.into(), self.config.port_reuse.clone())
+        TcpListenStream::<T>::new(socket.into(), self.config.port_reuse.clone())
     }
 }
 
@@ -366,7 +361,6 @@ where
 {
     fn default() -> Self {
         GenTcpTransport {
-            next_listener_id: ListenerId::new::<Self>(1),
             config: GenTcpConfig::default(),
             listeners: VecDeque::new(),
             pending_events: VecDeque::new(),
@@ -386,23 +380,24 @@ where
     type Dial = Pin<Box<dyn Future<Output = Result<Self::Output, Self::Error>> + Send>>;
     type ListenerUpgrade = Ready<Result<Self::Output, Self::Error>>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         let socket_addr = if let Ok(sa) = multiaddr_to_socketaddr(addr.clone()) {
             sa
         } else {
             return Err(TransportError::MultiaddrNotSupported(addr));
         };
-        let id = self.next_listener_id.next_id();
         log::debug!("listening on {}", socket_addr);
-        let listener = self
-            .do_listen(id, socket_addr)
-            .map_err(TransportError::Other)?;
+        let listener = self.do_listen(socket_addr).map_err(TransportError::Other)?;
         self.listeners.push_back(Box::pin(listener));
-        Ok(id)
+        Ok(())
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        if let Some(index) = self.listeners.iter().position(|l| l.listener_id != id) {
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        if let Some(index) = self
+            .listeners
+            .iter()
+            .position(|l| l.listen_addrs.contains(addr))
+        {
             let listener = self.listeners.remove(index).unwrap();
             for addr in &listener.listen_addrs {
                 self.pending_events
@@ -583,8 +578,6 @@ pub struct TcpListenStream<T>
 where
     T: Provider,
 {
-    /// The ID of this listener.
-    listener_id: ListenerId,
     /// The socket address that the listening socket is bound to,
     /// which may be a "wildcard address" like `INADDR_ANY` or `IN6ADDR_ANY`
     /// when listening on all interfaces for IPv4 respectively IPv6 connections.
@@ -619,11 +612,7 @@ where
 {
     /// Constructs a `TcpListenStream` for incoming connections around
     /// the given `TcpListener`.
-    fn new(
-        listener_id: ListenerId,
-        listener: TcpListener,
-        port_reuse: PortReuse,
-    ) -> io::Result<Self> {
+    fn new(listener: TcpListener, port_reuse: PortReuse) -> io::Result<Self> {
         let socket_addr = listener.local_addr()?;
 
         let in_addr = if match &socket_addr {
@@ -648,7 +637,6 @@ where
         Ok(TcpListenStream {
             port_reuse,
             listener,
-            listener_id,
             socket_addr,
             listen_addrs: Vec::new(),
             in_addr,

@@ -22,9 +22,7 @@ use crate::{
     ConnectionHandler, DialError, IntoConnectionHandler, NetworkBehaviour, NetworkBehaviourAction,
     PollParameters,
 };
-use libp2p_core::{
-    connection::ConnectionId, multiaddr::Multiaddr, transport::ListenerId, ConnectedPoint, PeerId,
-};
+use libp2p_core::{connection::ConnectionId, multiaddr::Multiaddr, ConnectedPoint, PeerId};
 use std::collections::HashMap;
 use std::task::{Context, Poll};
 

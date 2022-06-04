@@ -60,7 +60,7 @@ use futures::{future::BoxFuture, prelude::*};
 use libp2p_core::{
     connection::Endpoint,
     multiaddr::{Multiaddr, Protocol},
-    transport::{ListenerId, TransportError, TransportEvent},
+    transport::{TransportError, TransportEvent},
     Transport,
 };
 use parking_lot::Mutex;
@@ -197,16 +197,15 @@ where
         BoxFuture<'static, Result<Self::Output, Self::Error>>,
     >;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.inner
             .lock()
             .listen_on(addr)
-            .map(ListenerId::map_type::<Self>)
             .map_err(|e| e.map(DnsErr::Transport))
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.inner.lock().remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.lock().remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
@@ -596,14 +595,11 @@ mod tests {
             type ListenerUpgrade = BoxFuture<'static, Result<Self::Output, Self::Error>>;
             type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-            fn listen_on(
-                &mut self,
-                _: Multiaddr,
-            ) -> Result<ListenerId, TransportError<Self::Error>> {
+            fn listen_on(&mut self, _: Multiaddr) -> Result<(), TransportError<Self::Error>> {
                 unreachable!()
             }
 
-            fn remove_listener(&mut self, _: ListenerId) -> bool {
+            fn remove_listener(&mut self, _: &Multiaddr) -> bool {
                 false
             }
 

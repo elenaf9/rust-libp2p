@@ -25,7 +25,7 @@
 // TODO: add example
 
 use crate::{
-    transport::{ListenerId, TransportError, TransportEvent},
+    transport::{TransportError, TransportEvent},
     Multiaddr, Transport,
 };
 use futures::prelude::*;
@@ -85,14 +85,14 @@ where
     type ListenerUpgrade = Timeout<InnerTrans::ListenerUpgrade>;
     type Dial = Timeout<InnerTrans::Dial>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.inner
             .listen_on(addr)
             .map_err(|err| err.map(TransportTimeoutError::Other))
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.inner.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

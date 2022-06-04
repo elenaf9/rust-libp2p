@@ -26,7 +26,7 @@ use libp2p_core::{
     connection::Endpoint,
     either::EitherOutput,
     multiaddr::{Multiaddr, Protocol},
-    transport::{ListenerId, TransportError, TransportEvent},
+    transport::{TransportError, TransportEvent},
     Transport,
 };
 use log::{debug, trace};
@@ -130,7 +130,7 @@ where
     type ListenerUpgrade = BoxFuture<'static, Result<Self::Output, Self::Error>>;
     type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         if !self.is_tcp_addr(&addr) {
             debug!("{} is not a tcp multiaddr", addr);
             return Err(TransportError::MultiaddrNotSupported(addr));
@@ -150,16 +150,16 @@ where
                 return Err(TransportError::MultiaddrNotSupported(addr));
             }
         };
-        let id = match self.transport.lock().listen_on(inner_addr.clone()) {
-            Ok(id) => id,
-            Err(e) => return Err(e.map(Error::Transport)),
-        };
+        self.transport
+            .lock()
+            .listen_on(inner_addr.clone())
+            .map_err(|e| e.map(Error::Transport))?;
         self.insert_proto(inner_addr, proto);
-        Ok(id)
+        Ok(())
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.transport.lock().remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.lock().remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

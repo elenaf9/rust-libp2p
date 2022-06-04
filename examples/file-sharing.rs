@@ -509,7 +509,7 @@ mod network {
             match command {
                 Command::StartListening { addr, sender } => {
                     let _ = match self.swarm.listen_on(addr) {
-                        Ok(_) => sender.send(Ok(())),
+                        Ok(()) => sender.send(Ok(())),
                         Err(e) => sender.send(Err(Box::new(e))),
                     };
                 }

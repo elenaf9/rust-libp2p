@@ -89,7 +89,7 @@ use libp2p_core::{
     multiaddr::Protocol,
     multihash::Multihash,
     muxing::StreamMuxerBox,
-    transport::{self, ListenerId, TransportError, TransportEvent},
+    transport::{self, TransportError, TransportEvent},
     upgrade::ProtocolName,
     Endpoint, Executor, Multiaddr, Negotiated, PeerId, Transport,
 };
@@ -308,17 +308,16 @@ where
     ///
     /// Listeners report their new listening addresses as [`SwarmEvent::NewListenAddr`].
     /// Depending on the underlying transport, one listener may have multiple listening addresses.
-    pub fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<io::Error>> {
-        let id = self.transport.listen_on(addr)?;
-        Ok(id)
+    pub fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<io::Error>> {
+        self.transport.listen_on(addr)
     }
 
     /// Remove some listener.
     ///
     /// Returns `true` if there was a listener with this ID, `false`
     /// otherwise.
-    pub fn remove_listener(&mut self, listener_id: ListenerId) -> bool {
-        self.transport.remove_listener(listener_id)
+    pub fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.remove_listener(addr)
     }
 
     /// Dial a known or unknown peer.
@@ -2134,7 +2133,7 @@ mod tests {
             .connection_limits(limits(limit))
             .build();
 
-            let _ = network1.listen_on(multiaddr![Memory(0u64)]).unwrap();
+            network1.listen_on(multiaddr![Memory(0u64)]).unwrap();
             let listen_addr = async_std::task::block_on(poll_fn(|cx| {
                 match ready!(network1.poll_next_unpin(cx)).unwrap() {
                     SwarmEvent::NewListenAddr(address) => Poll::Ready(address),

@@ -21,7 +21,7 @@
 use crate::{
     connection::{ConnectedPoint, Endpoint},
     either::EitherError,
-    transport::{ListenerId, Transport, TransportError, TransportEvent},
+    transport::{Transport, TransportError, TransportEvent},
 };
 use futures::{future::Either, prelude::*};
 use multiaddr::Multiaddr;
@@ -54,14 +54,14 @@ where
     type ListenerUpgrade = AndThenFuture<T::ListenerUpgrade, C, F>;
     type Dial = AndThenFuture<T::Dial, C, F>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         self.transport
             .listen_on(addr)
             .map_err(|err| err.map(EitherError::A))
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.transport.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

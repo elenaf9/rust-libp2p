@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::transport::{ListenerId, Transport, TransportError, TransportEvent};
+use crate::transport::{Transport, TransportError, TransportEvent};
 use fnv::FnvHashMap;
 use futures::{
     channel::mpsc,
@@ -93,18 +93,9 @@ impl Hub {
 }
 
 /// Transport that supports `/memory/N` multiaddresses.
+#[derive(Default)]
 pub struct MemoryTransport {
     listeners: VecDeque<Pin<Box<Listener>>>,
-    next_listener_id: ListenerId,
-}
-
-impl Default for MemoryTransport {
-    fn default() -> Self {
-        MemoryTransport {
-            listeners: VecDeque::new(),
-            next_listener_id: ListenerId::new::<Self>(1),
-        }
-    }
 }
 
 impl MemoryTransport {
@@ -190,7 +181,7 @@ impl Transport for MemoryTransport {
     type ListenerUpgrade = Ready<Result<Self::Output, Self::Error>>;
     type Dial = DialFuture;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         let port = if let Ok(port) = parse_memory_addr(&addr) {
             port
         } else {
@@ -202,9 +193,7 @@ impl Transport for MemoryTransport {
             None => return Err(TransportError::Other(MemoryTransportError::Unreachable)),
         };
 
-        let id = self.next_listener_id.next_id();
         let listener = Listener {
-            id,
             port,
             addr: Protocol::Memory(port.get()).into(),
             receiver: rx,
@@ -212,11 +201,15 @@ impl Transport for MemoryTransport {
         };
         self.listeners.push_back(Box::pin(listener));
 
-        Ok(id)
+        Ok(())
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        if let Some(index) = self.listeners.iter().position(|listener| listener.id == id) {
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        if let Some(index) = self
+            .listeners
+            .iter()
+            .position(|listener| &listener.addr == addr)
+        {
             let listener = self.listeners.get_mut(index).unwrap();
             let val_in = HUB.unregister_port(&listener.port);
             debug_assert!(val_in.is_some());
@@ -317,7 +310,6 @@ impl error::Error for MemoryTransportError {}
 
 /// Listener for memory connections.
 pub struct Listener {
-    id: ListenerId,
     /// Port we're listening on.
     port: NonZeroU64,
     /// The address we are listening on.
@@ -460,20 +452,20 @@ mod tests {
         let addr_1: Multiaddr = "/memory/1639174018481".parse().unwrap();
         let addr_2: Multiaddr = "/memory/8459375923478".parse().unwrap();
 
-        let listener_id_1 = transport.listen_on(addr_1.clone()).unwrap();
-        assert!(transport.remove_listener(listener_id_1));
+        transport.listen_on(addr_1.clone()).unwrap();
+        assert!(transport.remove_listener(&addr_1));
 
-        let listener_id_2 = transport.listen_on(addr_1.clone()).unwrap();
-        let listener_id_3 = transport.listen_on(addr_2.clone()).unwrap();
+        transport.listen_on(addr_1.clone()).unwrap();
+        transport.listen_on(addr_2.clone()).unwrap();
 
         assert!(transport.listen_on(addr_1.clone()).is_err());
         assert!(transport.listen_on(addr_2.clone()).is_err());
 
-        assert!(transport.remove_listener(listener_id_2));
+        assert!(transport.remove_listener(&addr_1));
         assert!(transport.listen_on(addr_1).is_ok());
         assert!(transport.listen_on(addr_2.clone()).is_err());
 
-        assert!(transport.remove_listener(listener_id_3));
+        assert!(transport.remove_listener(&addr_2));
         assert!(transport.listen_on(addr_2).is_ok());
     }
 
@@ -498,21 +490,21 @@ mod tests {
 
         let mut transport = MemoryTransport::default().boxed();
         futures::executor::block_on(async {
-            let listener_id = transport.listen_on(addr.clone()).unwrap();
+            transport.listen_on(addr.clone()).unwrap();
             let reported_addr = transport
                 .select_next_some()
                 .await
                 .into_new_address()
                 .expect("new address");
             assert_eq!(addr, reported_addr);
-            assert!(transport.remove_listener(listener_id));
+            assert!(transport.remove_listener(&reported_addr));
             match transport.select_next_some().await {
                 TransportEvent::AddressExpired(expired) => {
                     assert_eq!(addr, expired);
                 }
                 other => panic!("Unexpected transport event: {:?}", other),
             }
-            assert!(!transport.remove_listener(listener_id));
+            assert!(!transport.remove_listener(&reported_addr));
         })
     }
 

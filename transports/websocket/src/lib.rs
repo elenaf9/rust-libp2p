@@ -30,7 +30,7 @@ use futures::{future::BoxFuture, prelude::*, ready};
 use libp2p_core::{
     connection::ConnectedPoint,
     multiaddr::Multiaddr,
-    transport::{map::MapFuture, ListenerId, TransportError, TransportEvent},
+    transport::{map::MapFuture, TransportError, TransportEvent},
     Transport,
 };
 use rw_stream_sink::RwStreamSink;
@@ -123,14 +123,12 @@ where
     type ListenerUpgrade = MapFuture<InnerFuture<T::Output, T::Error>, WrapperFn<T::Output>>;
     type Dial = MapFuture<InnerFuture<T::Output, T::Error>, WrapperFn<T::Output>>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
-        self.transport
-            .listen_on(addr)
-            .map(ListenerId::map_type::<Self>)
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
+        self.transport.listen_on(addr)
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.transport.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

@@ -20,7 +20,7 @@
 
 use crate::{
     muxing::{StreamMuxer, StreamMuxerEvent},
-    transport::{ListenerId, Transport, TransportError, TransportEvent},
+    transport::{Transport, TransportError, TransportEvent},
     Multiaddr, ProtocolName,
 };
 use futures::{
@@ -472,14 +472,14 @@ where
         }
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
         match self {
-            EitherTransport::Left(t) => t.remove_listener(id),
-            EitherTransport::Right(t) => t.remove_listener(id),
+            EitherTransport::Left(t) => t.remove_listener(addr),
+            EitherTransport::Right(t) => t.remove_listener(addr),
         }
     }
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         use TransportError::*;
         match self {
             EitherTransport::Left(a) => a.listen_on(addr).map_err(|e| match e {

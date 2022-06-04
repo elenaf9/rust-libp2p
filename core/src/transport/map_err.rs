@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::transport::{ListenerId, Transport, TransportError, TransportEvent};
+use crate::transport::{Transport, TransportError, TransportEvent};
 use futures::prelude::*;
 use multiaddr::Multiaddr;
 use std::{error, pin::Pin, task::Context, task::Poll};
@@ -50,13 +50,13 @@ where
     type ListenerUpgrade = MapErrListenerUpgrade<T, F>;
     type Dial = MapErrDial<T, F>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<Self::Error>> {
+    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
         let map = self.map.clone();
         self.transport.listen_on(addr).map_err(|err| err.map(map))
     }
 
-    fn remove_listener(&mut self, id: ListenerId) -> bool {
-        self.transport.remove_listener(id)
+    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.remove_listener(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

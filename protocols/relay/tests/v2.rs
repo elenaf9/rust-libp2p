@@ -104,7 +104,7 @@ fn new_reservation_to_same_relay_replaces_old() {
         .clone()
         .with(Protocol::P2p(client_peer_id.into()));
 
-    let old_listener = client.listen_on(client_addr.clone()).unwrap();
+    client.listen_on(client_addr.clone()).unwrap();
 
     // Wait for connection to relay.
     assert!(pool.run_until(wait_for_dial(&mut client, relay_peer_id)));

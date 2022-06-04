@@ -39,7 +39,6 @@ use futures::{
     future::{BoxFuture, Ready},
     prelude::*,
 };
-use libp2p_core::transport::ListenerId;
 use libp2p_core::{
     multiaddr::{Multiaddr, Protocol},
     transport::{TransportError, TransportEvent},
@@ -64,8 +63,7 @@ macro_rules! codegen {
         /// Represents the configuration for a Unix domain sockets transport capability for libp2p.
         #[cfg_attr(docsrs, doc(cfg(feature = $feature_name)))]
         pub struct $uds_config {
-            listeners: VecDeque<(ListenerId, Multiaddr, Listener<Self>)>,
-            next_listener_id: ListenerId,
+            listeners: VecDeque<(Multiaddr, Listener<Self>)>,
         }
 
         impl $uds_config {
@@ -73,7 +71,6 @@ macro_rules! codegen {
             pub fn new() -> $uds_config {
                 $uds_config {
                     listeners: VecDeque::new(),
-                    next_listener_id: ListenerId::new::<Self>(1),
                 }
             }
         }
@@ -90,12 +87,8 @@ macro_rules! codegen {
             type ListenerUpgrade = Ready<Result<Self::Output, Self::Error>>;
             type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-            fn listen_on(
-                &mut self,
-                addr: Multiaddr,
-            ) -> Result<ListenerId, TransportError<Self::Error>> {
+            fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
                 if let Ok(path) = multiaddr_to_path(&addr) {
-                    let id = self.next_listener_id.next_id();
                     let addr_clone = addr.clone();
                     let listener = $build_listener(path)
                         .map_ok(move |listener| {
@@ -129,23 +122,23 @@ macro_rules! codegen {
                         })
                         .try_flatten_stream()
                         .boxed();
-                    self.listeners.push_back((id, addr_clone, listener));
-                    Ok(id)
+                    self.listeners.push_back((addr_clone, listener));
+                    Ok(())
                 } else {
                     Err(TransportError::MultiaddrNotSupported(addr))
                 }
             }
 
-            fn remove_listener(&mut self, id: ListenerId) -> bool {
+            fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
                 if let Some(index) = self
                     .listeners
                     .iter()
-                    .position(|(listener_id, _, _)| listener_id == &id)
+                    .position(|(listener_addr, _)| listener_addr == addr)
                 {
                     let listener_stream = self.listeners.get_mut(index).unwrap();
-                    let addr = listener_stream.1.clone();
+                    let addr = listener_stream.0.clone();
                     let closed_stream = stream::empty().boxed();
-                    *listener_stream = (id, addr, closed_stream);
+                    *listener_stream = (addr, closed_stream);
                     true
                 } else {
                     false
@@ -182,7 +175,7 @@ macro_rules! codegen {
                 cx: &mut Context<'_>,
             ) -> Poll<TransportEvent<Self::ListenerUpgrade, Self::Error>> {
                 let mut remaining = self.listeners.len();
-                while let Some((id, addr, mut listener)) = self.listeners.pop_back() {
+                while let Some((addr, mut listener)) = self.listeners.pop_back() {
                     let event = match Stream::poll_next(Pin::new(&mut listener), cx) {
                         Poll::Pending => None,
                         Poll::Ready(Some(Ok(event))) => Some(event),
@@ -193,7 +186,7 @@ macro_rules! codegen {
                             return Poll::Ready(TransportEvent::AddressExpired(addr))
                         }
                     };
-                    self.listeners.push_front((id, addr, listener));
+                    self.listeners.push_front((addr, listener));
                     if let Some(event) = event {
                         return Poll::Ready(event);
                     } else {
@@ -324,7 +317,7 @@ mod tests {
         )));
 
         let mut transport = UdsConfig::new().boxed();
-        let listener_id = transport.listen_on(addr).unwrap();
+        transport.listen_on(addr).unwrap();
 
         async_std::task::block_on(async move {
             let listen_addr = transport
@@ -333,7 +326,7 @@ mod tests {
                 .into_new_address()
                 .expect("listen address");
 
-            assert!(transport.remove_listener(listener_id));
+            assert!(transport.remove_listener(&listen_addr));
             let expired_addr = transport
                 .select_next_some()
                 .await
