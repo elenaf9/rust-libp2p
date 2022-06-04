@@ -239,7 +239,7 @@ impl<TBvEv, THandleErr> super::Recorder<libp2p_swarm::SwarmEvent<TBvEv, THandleE
             libp2p_swarm::SwarmEvent::ListenFailure { .. } => {
                 self.swarm.listen_failed.inc();
             }
-            libp2p_swarm::SwarmEvent::ListenerError { .. } => {
+            libp2p_swarm::SwarmEvent::TransportError { .. } => {
                 self.swarm.listener_error.inc();
             }
             libp2p_swarm::SwarmEvent::Dialing(_) => {

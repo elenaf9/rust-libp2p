@@ -196,13 +196,6 @@ where
         }
     }
 
-    fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
-        match self {
-            Either::Left(a) => a.inject_listener_error(err),
-            Either::Right(b) => b.inject_listener_error(err),
-        }
-    }
-
     fn poll(
         &mut self,
         cx: &mut Context<'_>,

@@ -495,10 +495,6 @@ impl NetworkBehaviour for Behaviour {
         self.inner
             .inject_listen_failure(local_addr, send_back_addr, handler)
     }
-
-    fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
-        self.inner.inject_listener_error(err)
-    }
 }
 
 type Action = NetworkBehaviourAction<

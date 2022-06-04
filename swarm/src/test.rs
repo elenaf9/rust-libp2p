@@ -109,7 +109,6 @@ where
     pub inject_new_external_addr: Vec<Multiaddr>,
     pub inject_expired_listen_addr: Vec<Multiaddr>,
     pub inject_expired_external_addr: Vec<Multiaddr>,
-    pub inject_listener_error: Vec<ListenerId>,
     pub poll: usize,
 }
 
@@ -129,7 +128,6 @@ where
             inject_new_external_addr: Vec::new(),
             inject_expired_listen_addr: Vec::new(),
             inject_expired_external_addr: Vec::new(),
-            inject_listener_error: Vec::new(),
             poll: 0,
         }
     }
@@ -144,7 +142,6 @@ where
         self.inject_new_listen_addr = Vec::new();
         self.inject_new_external_addr = Vec::new();
         self.inject_expired_listen_addr = Vec::new();
-        self.inject_listener_error = Vec::new();
         self.poll = 0;
     }
 
@@ -376,12 +373,6 @@ where
     fn inject_expired_external_addr(&mut self, a: &Multiaddr) {
         self.inject_expired_external_addr.push(a.clone());
         self.inner.inject_expired_external_addr(a);
-    }
-
-    fn inject_listener_error(&mut self, e: &(dyn std::error::Error + 'static)) {
-        // TODO
-        // self.inject_listener_error.push(l.clone());
-        self.inner.inject_listener_error(e);
     }
 
     fn poll(

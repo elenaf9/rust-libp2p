@@ -217,9 +217,9 @@ pub enum SwarmEvent<TBehaviourOutEvent, THandlerErr> {
         /// The error value.
         error: io::Error,
     },
-    /// One of the listeners reported a non-fatal error.
-    ListenerError {
-        /// The listener error.
+    /// The transport reported a non-fatal error.
+    TransportError {
+        /// The transport error.
         error: io::Error,
     },
     /// A new dialing attempt has been initiated by the [`NetworkBehaviour`]
@@ -862,8 +862,7 @@ where
                 return Some(SwarmEvent::ListenFailure { addr, error });
             }
             TransportEvent::Error { error, .. } => {
-                self.behaviour.inject_listener_error(&error);
-                return Some(SwarmEvent::ListenerError { error });
+                return Some(SwarmEvent::TransportError { error });
             }
         }
         None

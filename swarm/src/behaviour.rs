@@ -279,9 +279,6 @@ pub trait NetworkBehaviour: 'static {
     /// which means that we are no longer listening in it.
     fn inject_expired_listen_addr(&mut self, _addr: &Multiaddr) {}
 
-    /// A listener experienced an error.
-    fn inject_listener_error(&mut self, _err: &(dyn std::error::Error + 'static)) {}
-
     /// Indicates to the behaviour that we have discovered a new external address for us.
     fn inject_new_external_addr(&mut self, _addr: &Multiaddr) {}
 
