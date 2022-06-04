@@ -205,12 +205,6 @@ where
         }
     }
 
-    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
-        if let Some(inner) = self.inner.as_mut() {
-            inner.inject_listener_closed(reason)
-        }
-    }
-
     fn poll(
         &mut self,
         cx: &mut Context<'_>,

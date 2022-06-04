@@ -277,7 +277,7 @@ impl Transport for MemoryTransport {
                 }),
                 Poll::Ready(None) => {
                     // Listener was closed.
-                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Ok(()) });
+                    return Poll::Ready(TransportEvent::AddressExpired(listener.addr.clone()));
                 }
             };
 
@@ -507,8 +507,8 @@ mod tests {
             assert_eq!(addr, reported_addr);
             assert!(transport.remove_listener(listener_id));
             match transport.select_next_some().await {
-                TransportEvent::ListenerClosed { reason } => {
-                    assert!(reason.is_ok())
+                TransportEvent::AddressExpired(expired) => {
+                    assert_eq!(addr, expired);
                 }
                 other => panic!("Unexpected transport event: {:?}", other),
             }

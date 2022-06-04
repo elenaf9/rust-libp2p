@@ -499,10 +499,6 @@ impl NetworkBehaviour for Behaviour {
     fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
         self.inner.inject_listener_error(err)
     }
-
-    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
-        self.inner.inject_listener_closed(reason)
-    }
 }
 
 type Action = NetworkBehaviourAction<

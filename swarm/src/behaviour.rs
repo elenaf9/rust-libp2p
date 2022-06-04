@@ -282,9 +282,6 @@ pub trait NetworkBehaviour: 'static {
     /// A listener experienced an error.
     fn inject_listener_error(&mut self, _err: &(dyn std::error::Error + 'static)) {}
 
-    /// A listener closed.
-    fn inject_listener_closed(&mut self, _reason: Result<(), &std::io::Error>) {}
-
     /// Indicates to the behaviour that we have discovered a new external address for us.
     fn inject_new_external_addr(&mut self, _addr: &Multiaddr) {}
 

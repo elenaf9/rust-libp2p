@@ -279,11 +279,12 @@ pub enum TransportEvent<TUpgr, TErr> {
         /// Address used to send back data to the incoming client.
         send_back_addr: Multiaddr,
     },
-    /// A listener closed.
-    ListenerClosed {
-        /// Reason for the closure. Contains `Ok(())` if the stream produced `None`, or `Err`
-        /// if the stream produced an error.
-        reason: Result<(), TErr>,
+    /// [`Transport::listen_on`] failed for the given address.
+    ListenFailure {
+        /// The address that was entered in [`Transport::listen_on`].
+        addr: Multiaddr,
+        /// The error value.
+        error: TErr,
     },
     /// A transport error occured.
     ///
@@ -310,7 +311,9 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
             TransportEvent::NewAddress(addr) => TransportEvent::NewAddress(addr),
             TransportEvent::AddressExpired(addr) => TransportEvent::AddressExpired(addr),
             TransportEvent::Error { error } => TransportEvent::Error { error },
-            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed { reason },
+            TransportEvent::ListenFailure { addr, error } => {
+                TransportEvent::ListenFailure { addr, error }
+            }
         }
     }
 
@@ -330,8 +333,9 @@ impl<TUpgr, TErr> TransportEvent<TUpgr, TErr> {
             TransportEvent::Error { error } => TransportEvent::Error {
                 error: map_err(error),
             },
-            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed {
-                reason: reason.map_err(map_err),
+            TransportEvent::ListenFailure { addr, error } => TransportEvent::ListenFailure {
+                addr,
+                error: map_err(error),
             },
         }
     }
@@ -425,9 +429,10 @@ impl<TUpgr, TErr: fmt::Debug> fmt::Debug for TransportEvent<TUpgr, TErr> {
                 .debug_struct("TransportEvent::Incoming")
                 .field("local_addr", local_addr)
                 .finish(),
-            TransportEvent::ListenerClosed { reason } => f
-                .debug_struct("TransportEvent::Closed")
-                .field("reason", reason)
+            TransportEvent::ListenFailure { error, addr } => f
+                .debug_struct("TransportEvent::ListenFailure")
+                .field("addr", addr)
+                .field("error", error)
                 .finish(),
             TransportEvent::Error { error } => f
                 .debug_struct("TransportEvent::Error")

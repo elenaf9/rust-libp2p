@@ -130,11 +130,8 @@ fn new_reservation_to_same_relay_replaces_old() {
         let mut new_listener_address_reported = false;
         loop {
             match client.select_next_some().await {
-                SwarmEvent::ListenerClosed {
-                    addresses,
-                    ..
-                } => {
-                    assert_eq!(addresses, vec![client_addr_with_peer_id.clone()]);
+                SwarmEvent::ExpiredListenAddr(addr) => {
+                    assert_eq!(addr, client_addr_with_peer_id.clone());
                     old_listener_closed = true;
                     if new_reservation_accepted && new_listener_address_reported {
                         break;

@@ -203,8 +203,9 @@ where
             TransportEvent::Error { error } => TransportEvent::Error {
                 error: Error::Transport(error),
             },
-            TransportEvent::ListenerClosed { reason } => TransportEvent::ListenerClosed {
-                reason: reason.map_err(Error::Transport),
+            TransportEvent::ListenFailure { addr, error } => TransportEvent::ListenFailure {
+                error: Error::Transport(error),
+                addr,
             },
             TransportEvent::Incoming {
                 upgrade,

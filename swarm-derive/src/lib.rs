@@ -326,17 +326,6 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
             })
     };
 
-    // Build the list of statements to put in the body of `inject_listener_closed()`.
-    let inject_listener_closed_stmts = {
-        data_struct_fields
-            .iter()
-            .enumerate()
-            .map(move |(field_n, field)| match field.ident {
-                Some(ref i) => quote!(self.#i.inject_listener_closed(reason);),
-                None => quote!(self.#field_n.inject_listener_closed(reason);),
-            })
-    };
-
     // Build the list of variants to put in the body of `inject_event()`.
     //
     // The event type is a construction of nested `#either_ident`s of the events of the children.
@@ -570,10 +559,6 @@ fn build_struct(ast: &DeriveInput, data_struct: &DataStruct) -> TokenStream {
 
             fn inject_listener_error(&mut self, err: &(dyn std::error::Error + 'static)) {
                 #(#inject_listener_error_stmts);*
-            }
-
-            fn inject_listener_closed(&mut self, reason: std::result::Result<(), &std::io::Error>) {
-                #(#inject_listener_closed_stmts);*
             }
 
             fn inject_event(

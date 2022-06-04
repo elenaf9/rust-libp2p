@@ -210,15 +210,12 @@ pub enum SwarmEvent<TBehaviourOutEvent, THandlerErr> {
     NewListenAddr(Multiaddr),
     /// Our transport has reported the expiration of a listening address.
     ExpiredListenAddr(Multiaddr),
-    /// One of the listeners gracefully closed.
-    ListenerClosed {
-        /// The addresses that the listener was listening on. These addresses are now considered
-        /// expired, similar to if a [`ExpiredListenAddr`](SwarmEvent::ExpiredListenAddr) event
-        /// has been generated for each of them.
-        addresses: Vec<Multiaddr>,
-        /// Reason for the closure. Contains `Ok(())` if the stream produced `None`, or `Err`
-        /// if the stream produced an error.
-        reason: Result<(), io::Error>,
+    /// [`Swarm::listen_on`] failed for the given address.
+    ListenFailure {
+        /// The address that was entered in [`Transport::listen_on`].
+        addr: Multiaddr,
+        /// The error value.
+        error: io::Error,
     },
     /// One of the listeners reported a non-fatal error.
     ListenerError {
@@ -860,17 +857,9 @@ where
                 self.behaviour.inject_expired_listen_addr(&addr);
                 return Some(SwarmEvent::ExpiredListenAddr(addr));
             }
-            TransportEvent::ListenerClosed { reason } => {
-                log::debug!("Listener closed by {:?}.", reason);
-                self.behaviour.inject_listener_closed(match &reason {
-                    Ok(()) => Ok(()),
-                    Err(err) => Err(err),
-                });
-                return Some(SwarmEvent::ListenerClosed {
-                    // TODO
-                    addresses: vec![],
-                    reason,
-                });
+            TransportEvent::ListenFailure { addr, error } => {
+                log::debug!("Listening on {:?} failed: {:?}.", addr, error);
+                return Some(SwarmEvent::ListenFailure { addr, error });
             }
             TransportEvent::Error { error, .. } => {
                 self.behaviour.inject_listener_error(&error);

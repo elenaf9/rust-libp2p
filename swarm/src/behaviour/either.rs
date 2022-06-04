@@ -203,13 +203,6 @@ where
         }
     }
 
-    fn inject_listener_closed(&mut self, reason: Result<(), &std::io::Error>) {
-        match self {
-            Either::Left(a) => a.inject_listener_closed(reason),
-            Either::Right(b) => b.inject_listener_closed(reason),
-        }
-    }
-
     fn poll(
         &mut self,
         cx: &mut Context<'_>,

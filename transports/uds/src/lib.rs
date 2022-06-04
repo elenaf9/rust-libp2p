@@ -55,7 +55,7 @@ pub type Listener<T> = BoxStream<
     'static,
     Result<
         TransportEvent<<T as Transport>::ListenerUpgrade, <T as Transport>::Error>,
-        Result<(), <T as Transport>::Error>,
+        <T as Transport>::Error,
     >,
 >;
 
@@ -64,7 +64,7 @@ macro_rules! codegen {
         /// Represents the configuration for a Unix domain sockets transport capability for libp2p.
         #[cfg_attr(docsrs, doc(cfg(feature = $feature_name)))]
         pub struct $uds_config {
-            listeners: VecDeque<(ListenerId, Listener<Self>)>,
+            listeners: VecDeque<(ListenerId, Multiaddr, Listener<Self>)>,
             next_listener_id: ListenerId,
         }
 
@@ -96,8 +96,8 @@ macro_rules! codegen {
             ) -> Result<ListenerId, TransportError<Self::Error>> {
                 if let Ok(path) = multiaddr_to_path(&addr) {
                     let id = self.next_listener_id.next_id();
+                    let addr_clone = addr.clone();
                     let listener = $build_listener(path)
-                        .map_err(Err)
                         .map_ok(move |listener| {
                             stream::once({
                                 let addr = addr.clone();
@@ -129,7 +129,7 @@ macro_rules! codegen {
                         })
                         .try_flatten_stream()
                         .boxed();
-                    self.listeners.push_back((id, listener));
+                    self.listeners.push_back((id, addr_clone, listener));
                     Ok(id)
                 } else {
                     Err(TransportError::MultiaddrNotSupported(addr))
@@ -140,11 +140,12 @@ macro_rules! codegen {
                 if let Some(index) = self
                     .listeners
                     .iter()
-                    .position(|(listener_id, _)| listener_id == &id)
+                    .position(|(listener_id, _, _)| listener_id == &id)
                 {
                     let listener_stream = self.listeners.get_mut(index).unwrap();
-                    let report_closed_stream = stream::once(async { Err(Ok(())) }).boxed();
-                    *listener_stream = (id, report_closed_stream);
+                    let addr = listener_stream.1.clone();
+                    let closed_stream = stream::empty().boxed();
+                    *listener_stream = (id, addr, closed_stream);
                     true
                 } else {
                     false
@@ -181,16 +182,18 @@ macro_rules! codegen {
                 cx: &mut Context<'_>,
             ) -> Poll<TransportEvent<Self::ListenerUpgrade, Self::Error>> {
                 let mut remaining = self.listeners.len();
-                while let Some((id, mut listener)) = self.listeners.pop_back() {
+                while let Some((id, addr, mut listener)) = self.listeners.pop_back() {
                     let event = match Stream::poll_next(Pin::new(&mut listener), cx) {
                         Poll::Pending => None,
-                        Poll::Ready(None) => panic!("Alive listeners always have a sender."),
                         Poll::Ready(Some(Ok(event))) => Some(event),
-                        Poll::Ready(Some(Err(reason))) => {
-                            return Poll::Ready(TransportEvent::ListenerClosed { reason })
+                        Poll::Ready(Some(Err(error))) => {
+                            return Poll::Ready(TransportEvent::ListenFailure { addr, error })
+                        }
+                        Poll::Ready(None) => {
+                            return Poll::Ready(TransportEvent::AddressExpired(addr))
                         }
                     };
-                    self.listeners.push_front((id, listener));
+                    self.listeners.push_front((id, addr, listener));
                     if let Some(event) = event {
                         return Poll::Ready(event);
                     } else {
@@ -310,6 +313,34 @@ mod tests {
             let mut socket = uds.dial(addr).unwrap().await.unwrap();
             socket.write(&[1, 2, 3]).await.unwrap();
         });
+    }
+
+    #[test]
+    fn remove_listener() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let socket = temp_dir.path().join("socket2");
+        let addr = Multiaddr::from(Protocol::Unix(Cow::Owned(
+            socket.to_string_lossy().into_owned(),
+        )));
+
+        let mut transport = UdsConfig::new().boxed();
+        let listener_id = transport.listen_on(addr).unwrap();
+
+        async_std::task::block_on(async move {
+            let listen_addr = transport
+                .select_next_some()
+                .await
+                .into_new_address()
+                .expect("listen address");
+
+            assert!(transport.remove_listener(listener_id));
+            let expired_addr = transport
+                .select_next_some()
+                .await
+                .into_address_expired()
+                .expect("expired address");
+            assert_eq!(listen_addr, expired_addr)
+        })
     }
 
     #[test]

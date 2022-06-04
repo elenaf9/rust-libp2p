@@ -93,7 +93,7 @@ enum PortReuse {
     Enabled {
         /// The addresses and ports of the listening sockets
         /// registered as eligible for port reuse when dialing.
-        listen_addrs: HashSet<(IpAddr, Port)>,
+        socket_addrs: HashSet<(IpAddr, Port)>,
     },
 }
 
@@ -102,9 +102,9 @@ impl PortReuse {
     ///
     /// Has no effect if port reuse is disabled.
     fn register(&mut self, ip: IpAddr, port: Port) {
-        if let PortReuse::Enabled { listen_addrs } = self {
+        if let PortReuse::Enabled { socket_addrs } = self {
             log::trace!("Registering for port reuse: {}:{}", ip, port);
-            listen_addrs.insert((ip, port));
+            socket_addrs.insert((ip, port));
         }
     }
 
@@ -112,9 +112,9 @@ impl PortReuse {
     ///
     /// Has no effect if port reuse is disabled.
     fn unregister(&mut self, ip: IpAddr, port: Port) {
-        if let PortReuse::Enabled { listen_addrs } = self {
+        if let PortReuse::Enabled { socket_addrs } = self {
             log::trace!("Unregistering for port reuse: {}:{}", ip, port);
-            listen_addrs.remove(&(ip, port));
+            socket_addrs.remove(&(ip, port));
         }
     }
 
@@ -128,8 +128,8 @@ impl PortReuse {
     /// Returns `None` if port reuse is disabled or no suitable
     /// listening socket address is found.
     fn local_dial_addr(&self, remote_ip: &IpAddr) -> Option<SocketAddr> {
-        if let PortReuse::Enabled { listen_addrs } = self {
-            for (ip, port) in listen_addrs.iter() {
+        if let PortReuse::Enabled { socket_addrs } = self {
+            for (ip, port) in socket_addrs.iter() {
                 if ip.is_ipv4() == remote_ip.is_ipv4()
                     && ip.is_loopback() == remote_ip.is_loopback()
                 {
@@ -281,7 +281,7 @@ impl GenTcpConfig {
     pub fn port_reuse(mut self, port_reuse: bool) -> Self {
         self.port_reuse = if port_reuse {
             PortReuse::Enabled {
-                listen_addrs: HashSet::new(),
+                socket_addrs: HashSet::new(),
             }
         } else {
             PortReuse::Disabled
@@ -403,9 +403,11 @@ where
 
     fn remove_listener(&mut self, id: ListenerId) -> bool {
         if let Some(index) = self.listeners.iter().position(|l| l.listener_id != id) {
-            self.listeners.remove(index);
-            self.pending_events
-                .push_back(TransportEvent::ListenerClosed { reason: Ok(()) });
+            let listener = self.listeners.remove(index).unwrap();
+            for addr in &listener.listen_addrs {
+                self.pending_events
+                    .push_back(TransportEvent::AddressExpired(addr.clone()));
+            }
             true
         } else {
             false
@@ -495,7 +497,7 @@ where
         // We remove each element from `listeners` one by one and add them back.
         let mut remaining = self.listeners.len();
         while let Some(mut listener) = self.listeners.pop_back() {
-            match TryStream::try_poll_next(listener.as_mut(), cx) {
+            match listener.as_mut().poll(cx) {
                 Poll::Pending => {
                     self.listeners.push_front(listener);
                     remaining -= 1;
@@ -503,11 +505,11 @@ where
                         break;
                     }
                 }
-                Poll::Ready(Some(Ok(TcpTransportEvent::Upgrade {
+                Poll::Ready(TcpTransportEvent::Upgrade {
                     upgrade,
                     local_addr,
                     remote_addr,
-                }))) => {
+                }) => {
                     self.listeners.push_front(listener);
                     return Poll::Ready(TransportEvent::Incoming {
                         upgrade,
@@ -515,23 +517,17 @@ where
                         send_back_addr: remote_addr,
                     });
                 }
-                Poll::Ready(Some(Ok(TcpTransportEvent::NewAddress(a)))) => {
+                Poll::Ready(TcpTransportEvent::NewAddress(a)) => {
                     self.listeners.push_front(listener);
                     return Poll::Ready(TransportEvent::NewAddress(a));
                 }
-                Poll::Ready(Some(Ok(TcpTransportEvent::AddressExpired(a)))) => {
+                Poll::Ready(TcpTransportEvent::AddressExpired(a)) => {
                     self.listeners.push_front(listener);
                     return Poll::Ready(TransportEvent::AddressExpired(a));
                 }
-                Poll::Ready(Some(Ok(TcpTransportEvent::Error(error)))) => {
+                Poll::Ready(TcpTransportEvent::Error(error)) => {
                     self.listeners.push_front(listener);
                     return Poll::Ready(TransportEvent::Error { error });
-                }
-                Poll::Ready(None) => {
-                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Ok(()) });
-                }
-                Poll::Ready(Some(Err(err))) => {
-                    return Poll::Ready(TransportEvent::ListenerClosed { reason: Err(err) });
                 }
             }
         }
@@ -592,7 +588,9 @@ where
     /// The socket address that the listening socket is bound to,
     /// which may be a "wildcard address" like `INADDR_ANY` or `IN6ADDR_ANY`
     /// when listening on all interfaces for IPv4 respectively IPv6 connections.
-    listen_addr: SocketAddr,
+    socket_addr: SocketAddr,
+    /// Listening addresses of this listener.
+    listen_addrs: Vec<Multiaddr>,
     /// The async listening socket for incoming connections.
     listener: T::Listener,
     /// The IP addresses of network interfaces on which the listening socket
@@ -626,9 +624,9 @@ where
         listener: TcpListener,
         port_reuse: PortReuse,
     ) -> io::Result<Self> {
-        let listen_addr = listener.local_addr()?;
+        let socket_addr = listener.local_addr()?;
 
-        let in_addr = if match &listen_addr {
+        let in_addr = if match &socket_addr {
             SocketAddr::V4(a) => a.ip().is_unspecified(),
             SocketAddr::V6(a) => a.ip().is_unspecified(),
         } {
@@ -640,8 +638,8 @@ where
             }
         } else {
             InAddr::One {
-                out: Some(ip_to_multiaddr(listen_addr.ip(), listen_addr.port())),
-                addr: listen_addr.ip(),
+                out: Some(ip_to_multiaddr(socket_addr.ip(), socket_addr.port())),
+                addr: socket_addr.ip(),
             }
         };
 
@@ -651,7 +649,8 @@ where
             port_reuse,
             listener,
             listener_id,
-            listen_addr,
+            socket_addr,
+            listen_addrs: Vec::new(),
             in_addr,
             pause: None,
             sleep_on_error: Duration::from_millis(100),
@@ -667,36 +666,17 @@ where
     fn disable_port_reuse(&mut self) {
         match &self.in_addr {
             InAddr::One { addr, .. } => {
-                self.port_reuse.unregister(*addr, self.listen_addr.port());
+                self.port_reuse.unregister(*addr, self.socket_addr.port());
             }
             InAddr::Any { addrs, .. } => {
                 for addr in addrs {
-                    self.port_reuse.unregister(*addr, self.listen_addr.port());
+                    self.port_reuse.unregister(*addr, self.socket_addr.port());
                 }
             }
         }
     }
-}
 
-impl<T> Drop for TcpListenStream<T>
-where
-    T: Provider,
-{
-    fn drop(&mut self) {
-        self.disable_port_reuse();
-    }
-}
-
-impl<T> Stream for TcpListenStream<T>
-where
-    T: Provider,
-    T::Listener: Unpin,
-    T::Stream: Unpin,
-    T::IfWatcher: Unpin,
-{
-    type Item = Result<TcpTransportEvent<T::Stream>, io::Error>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<TcpTransportEvent<T::Stream>> {
         let me = Pin::into_inner(self);
 
         loop {
@@ -715,7 +695,7 @@ where
                             };
                             *if_watch = IfWatch::Pending(T::if_watcher());
                             me.pause = Some(Delay::new(me.sleep_on_error));
-                            return Poll::Ready(Some(Ok(TcpTransportEvent::Error(err))));
+                            return Poll::Ready(TcpTransportEvent::Error(err));
                         }
                     },
                     // Consume all events for up/down interface changes.
@@ -724,26 +704,24 @@ where
                             match ev {
                                 Ok(IfEvent::Up(inet)) => {
                                     let ip = inet.addr();
-                                    if me.listen_addr.is_ipv4() == ip.is_ipv4() && addrs.insert(ip)
+                                    if me.socket_addr.is_ipv4() == ip.is_ipv4() && addrs.insert(ip)
                                     {
-                                        let ma = ip_to_multiaddr(ip, me.listen_addr.port());
+                                        let ma = ip_to_multiaddr(ip, me.socket_addr.port());
                                         log::debug!("New listen address: {}", ma);
-                                        me.port_reuse.register(ip, me.listen_addr.port());
-                                        return Poll::Ready(Some(Ok(
-                                            TcpTransportEvent::NewAddress(ma),
-                                        )));
+                                        me.port_reuse.register(ip, me.socket_addr.port());
+                                        me.listen_addrs.push(ma.clone());
+                                        return Poll::Ready(TcpTransportEvent::NewAddress(ma));
                                     }
                                 }
                                 Ok(IfEvent::Down(inet)) => {
                                     let ip = inet.addr();
-                                    if me.listen_addr.is_ipv4() == ip.is_ipv4() && addrs.remove(&ip)
+                                    if me.socket_addr.is_ipv4() == ip.is_ipv4() && addrs.remove(&ip)
                                     {
-                                        let ma = ip_to_multiaddr(ip, me.listen_addr.port());
+                                        let ma = ip_to_multiaddr(ip, me.socket_addr.port());
                                         log::debug!("Expired listen address: {}", ma);
-                                        me.port_reuse.unregister(ip, me.listen_addr.port());
-                                        return Poll::Ready(Some(Ok(
-                                            TcpTransportEvent::AddressExpired(ma),
-                                        )));
+                                        me.port_reuse.unregister(ip, me.socket_addr.port());
+                                        me.listen_addrs.retain(|a| a != &ma);
+                                        return Poll::Ready(TcpTransportEvent::AddressExpired(ma));
                                     }
                                 }
                                 Err(err) => {
@@ -752,7 +730,7 @@ where
                                         err
                                     };
                                     me.pause = Some(Delay::new(me.sleep_on_error));
-                                    return Poll::Ready(Some(Ok(TcpTransportEvent::Error(err))));
+                                    return Poll::Ready(TcpTransportEvent::Error(err));
                                 }
                             }
                         }
@@ -762,8 +740,8 @@ where
                 // address is registered for port reuse and reported once.
                 InAddr::One { addr, out } => {
                     if let Some(multiaddr) = out.take() {
-                        me.port_reuse.register(*addr, me.listen_addr.port());
-                        return Poll::Ready(Some(Ok(TcpTransportEvent::NewAddress(multiaddr))));
+                        me.port_reuse.register(*addr, me.socket_addr.port());
+                        return Poll::Ready(TcpTransportEvent::NewAddress(multiaddr));
                     }
                 }
             }
@@ -786,7 +764,7 @@ where
                     // These errors are non-fatal for the listener stream.
                     log::error!("error accepting incoming connection: {}", e);
                     me.pause = Some(Delay::new(me.sleep_on_error));
-                    return Poll::Ready(Some(Ok(TcpTransportEvent::Error(e))));
+                    return Poll::Ready(TcpTransportEvent::Error(e));
                 }
             };
 
@@ -796,12 +774,21 @@ where
 
             log::debug!("Incoming connection from {} at {}", remote_addr, local_addr);
 
-            return Poll::Ready(Some(Ok(TcpTransportEvent::Upgrade {
+            return Poll::Ready(TcpTransportEvent::Upgrade {
                 upgrade: future::ok(incoming.stream),
                 local_addr,
                 remote_addr,
-            })));
+            });
         }
+    }
+}
+
+impl<T> Drop for TcpListenStream<T>
+where
+    T: Provider,
+{
+    fn drop(&mut self) {
+        self.disable_port_reuse();
     }
 }
 

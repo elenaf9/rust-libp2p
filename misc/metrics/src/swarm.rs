@@ -33,7 +33,7 @@ pub struct Metrics {
     new_listen_addr: Counter,
     expired_listen_addr: Counter,
 
-    listener_closed: Counter,
+    listen_failed: Counter,
     listener_error: Counter,
 
     dial_attempt: Counter,
@@ -73,11 +73,11 @@ impl Metrics {
             Box::new(expired_listen_addr.clone()),
         );
 
-        let listener_closed = Counter::default();
+        let listen_failed = Counter::default();
         sub_registry.register(
-            "listener_closed",
+            "listen_failed",
             "Number of listeners closed",
-            Box::new(listener_closed.clone()),
+            Box::new(listen_failed.clone()),
         );
 
         let listener_error = Counter::default();
@@ -129,7 +129,7 @@ impl Metrics {
             connections_closed,
             new_listen_addr,
             expired_listen_addr,
-            listener_closed,
+            listen_failed,
             listener_error,
             dial_attempt,
             outgoing_connection_error,
@@ -236,8 +236,8 @@ impl<TBvEv, THandleErr> super::Recorder<libp2p_swarm::SwarmEvent<TBvEv, THandleE
             libp2p_swarm::SwarmEvent::ExpiredListenAddr(_) => {
                 self.swarm.expired_listen_addr.inc();
             }
-            libp2p_swarm::SwarmEvent::ListenerClosed { .. } => {
-                self.swarm.listener_closed.inc();
+            libp2p_swarm::SwarmEvent::ListenFailure { .. } => {
+                self.swarm.listen_failed.inc();
             }
             libp2p_swarm::SwarmEvent::ListenerError { .. } => {
                 self.swarm.listener_error.inc();
