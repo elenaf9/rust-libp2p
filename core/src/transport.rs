@@ -28,7 +28,6 @@
 use futures::prelude::*;
 use multiaddr::Multiaddr;
 use std::{
-    any::{Any, TypeId},
     error::Error,
     fmt,
     pin::Pin,
@@ -226,35 +225,6 @@ pub trait Transport {
         Self::Error: 'static,
     {
         upgrade::Builder::new(self, version)
-    }
-}
-
-/// The ID of a single listener.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ListenerId {
-    id: u64,
-    transport_id: TypeId,
-}
-
-impl ListenerId {
-    /// Creates a new `ListListenerIdenerId`.
-    pub fn new<T: Any>(id: u64) -> Self {
-        Self {
-            id,
-            transport_id: TypeId::of::<T>(),
-        }
-    }
-
-    /// Returns the next id
-    pub fn next_id(&mut self) -> Self {
-        let current = *self;
-        self.id += 1;
-        current
-    }
-
-    pub fn map_type<T: Any>(mut self) -> Self {
-        self.transport_id = TypeId::of::<T>();
-        self
     }
 }
 
