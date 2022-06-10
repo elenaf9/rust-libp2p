@@ -58,8 +58,8 @@ where
         Err(TransportError::MultiaddrNotSupported(addr))
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.0.remove_listener(addr) || self.1.remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.0.stop_listen_on(addr) || self.1.stop_listen_on(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

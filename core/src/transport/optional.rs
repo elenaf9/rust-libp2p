@@ -68,9 +68,9 @@ where
         }
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
         if let Some(inner) = self.0.as_mut() {
-            inner.remove_listener(addr)
+            inner.stop_listen_on(addr)
         } else {
             false
         }

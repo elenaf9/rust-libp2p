@@ -122,7 +122,7 @@ pub trait Transport {
     ///
     /// Return `true` if there was a listener with this Id, `false`
     /// otherwise.
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool;
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool;
 
     /// Dials the given [`Multiaddr`], returning a future for a pending outbound connection.
     ///

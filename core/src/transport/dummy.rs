@@ -63,7 +63,7 @@ impl<TOut> Transport for DummyTransport<TOut> {
         Err(TransportError::MultiaddrNotSupported(addr))
     }
 
-    fn remove_listener(&mut self, _addr: &Multiaddr) -> bool {
+    fn stop_listen_on(&mut self, _addr: &Multiaddr) -> bool {
         false
     }
 

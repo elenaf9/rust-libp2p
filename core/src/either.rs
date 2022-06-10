@@ -472,10 +472,10 @@ where
         }
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
         match self {
-            EitherTransport::Left(t) => t.remove_listener(addr),
-            EitherTransport::Right(t) => t.remove_listener(addr),
+            EitherTransport::Left(t) => t.stop_listen_on(addr),
+            EitherTransport::Right(t) => t.stop_listen_on(addr),
         }
     }
 

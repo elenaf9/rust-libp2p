@@ -60,8 +60,8 @@ where
             .map_err(|err| err.map(EitherError::A))
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.transport.remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.stop_listen_on(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

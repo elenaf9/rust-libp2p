@@ -316,8 +316,8 @@ where
     ///
     /// Returns `true` if there was a listener with this ID, `false`
     /// otherwise.
-    pub fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.transport.remove_listener(addr)
+    pub fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.transport.stop_listen_on(addr)
     }
 
     /// Dial a known or unknown peer.

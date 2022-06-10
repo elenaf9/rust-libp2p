@@ -53,7 +53,7 @@ type ListenerUpgrade<O> = Pin<Box<dyn Future<Output = io::Result<O>> + Send>>;
 
 trait Abstract<O> {
     fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<io::Error>>;
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool;
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool;
     fn dial(&mut self, addr: Multiaddr) -> Result<Dial<O>, TransportError<io::Error>>;
     fn dial_as_listener(&mut self, addr: Multiaddr) -> Result<Dial<O>, TransportError<io::Error>>;
     fn address_translation(&self, server: &Multiaddr, observed: &Multiaddr) -> Option<Multiaddr>;
@@ -74,8 +74,8 @@ where
         Transport::listen_on(self, addr).map_err(|e| e.map(box_err))
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        Transport::remove_listener(self, addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        Transport::stop_listen_on(self, addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Dial<O>, TransportError<io::Error>> {
@@ -127,8 +127,8 @@ impl<O> Transport for Boxed<O> {
         self.inner.listen_on(addr)
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.inner.remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.stop_listen_on(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {

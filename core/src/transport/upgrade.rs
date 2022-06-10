@@ -338,8 +338,8 @@ where
         self.0.dial(addr)
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.0.remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.0.stop_listen_on(addr)
     }
 
     fn dial_as_listener(
@@ -410,8 +410,8 @@ where
         })
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.inner.remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.stop_listen_on(addr)
     }
 
     fn dial_as_listener(

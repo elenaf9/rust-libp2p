@@ -204,7 +204,7 @@ impl Transport for MemoryTransport {
         Ok(())
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
         if let Some(index) = self
             .listeners
             .iter()
@@ -453,7 +453,7 @@ mod tests {
         let addr_2: Multiaddr = "/memory/8459375923478".parse().unwrap();
 
         transport.listen_on(addr_1.clone()).unwrap();
-        assert!(transport.remove_listener(&addr_1));
+        assert!(transport.stop_listen_on(&addr_1));
 
         transport.listen_on(addr_1.clone()).unwrap();
         transport.listen_on(addr_2.clone()).unwrap();
@@ -461,11 +461,11 @@ mod tests {
         assert!(transport.listen_on(addr_1.clone()).is_err());
         assert!(transport.listen_on(addr_2.clone()).is_err());
 
-        assert!(transport.remove_listener(&addr_1));
+        assert!(transport.stop_listen_on(&addr_1));
         assert!(transport.listen_on(addr_1).is_ok());
         assert!(transport.listen_on(addr_2.clone()).is_err());
 
-        assert!(transport.remove_listener(&addr_2));
+        assert!(transport.stop_listen_on(&addr_2));
         assert!(transport.listen_on(addr_2).is_ok());
     }
 
@@ -497,14 +497,14 @@ mod tests {
                 .into_new_address()
                 .expect("new address");
             assert_eq!(addr, reported_addr);
-            assert!(transport.remove_listener(&reported_addr));
+            assert!(transport.stop_listen_on(&reported_addr));
             match transport.select_next_some().await {
                 TransportEvent::AddressExpired(expired) => {
                     assert_eq!(addr, expired);
                 }
                 other => panic!("Unexpected transport event: {:?}", other),
             }
-            assert!(!transport.remove_listener(&reported_addr));
+            assert!(!transport.stop_listen_on(&reported_addr));
         })
     }
 

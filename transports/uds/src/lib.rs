@@ -129,7 +129,7 @@ macro_rules! codegen {
                 }
             }
 
-            fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+            fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
                 if let Some(index) = self
                     .listeners
                     .iter()
@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn remove_listener() {
+    fn stop_listen_on() {
         let temp_dir = tempfile::tempdir().unwrap();
         let socket = temp_dir.path().join("socket2");
         let addr = Multiaddr::from(Protocol::Unix(Cow::Owned(
@@ -326,7 +326,7 @@ mod tests {
                 .into_new_address()
                 .expect("listen address");
 
-            assert!(transport.remove_listener(&listen_addr));
+            assert!(transport.stop_listen_on(&listen_addr));
             let expired_addr = transport
                 .select_next_some()
                 .await

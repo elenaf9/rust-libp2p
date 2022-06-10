@@ -204,8 +204,8 @@ where
             .map_err(|e| e.map(DnsErr::Transport))
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
-        self.inner.lock().remove_listener(addr)
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
+        self.inner.lock().stop_listen_on(addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
@@ -599,7 +599,7 @@ mod tests {
                 unreachable!()
             }
 
-            fn remove_listener(&mut self, _: &Multiaddr) -> bool {
+            fn stop_listen_on(&mut self, _: &Multiaddr) -> bool {
                 false
             }
 

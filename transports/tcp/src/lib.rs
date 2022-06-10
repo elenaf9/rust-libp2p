@@ -392,7 +392,7 @@ where
         Ok(())
     }
 
-    fn remove_listener(&mut self, addr: &Multiaddr) -> bool {
+    fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
         if let Some(index) = self
             .listeners
             .iter()
