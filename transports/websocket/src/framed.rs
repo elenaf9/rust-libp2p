@@ -463,7 +463,7 @@ impl ListenAddrsProtos {
     /// [`TcpAddress::matches_addr`]. Non-wildcard addresses are prioritized over
     /// wildcard ones.
     fn get_proto(&mut self, addr: &Multiaddr) -> Option<Protocol> {
-        let index = self.0.iter().position(|(a, _)| a.matches_addr(&addr))?;
+        let index = self.0.iter().position(|(a, _)| a.matches_addr(addr))?;
         let (tcp_addr, proto) = self.0.get_mut(index).unwrap();
         let proto = proto.clone();
         if tcp_addr.is_wildcard() {
