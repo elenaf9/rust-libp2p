@@ -223,6 +223,7 @@ mod tests {
     use futures::prelude::*;
     use libp2p_core::{multiaddr::Protocol, Multiaddr, PeerId, Transport};
     use libp2p_tcp as tcp;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[test]
     fn dialer_connects_to_listener_ipv4() {
@@ -252,6 +253,14 @@ mod tests {
 
         assert_eq!(Some(Protocol::Ws("/".into())), addr.iter().nth(2));
         assert_ne!(Some(Protocol::Tcp(0)), addr.iter().nth(1));
+        assert_ne!(
+            Some(Protocol::Ip4(std::net::Ipv4Addr::UNSPECIFIED)),
+            addr.iter().nth(0)
+        );
+        assert_ne!(
+            Some(Protocol::Ip6(std::net::Ipv6Addr::UNSPECIFIED)),
+            addr.iter().nth(0)
+        );
 
         let inbound = async move {
             let (conn, _addr) = ws_config
@@ -268,5 +277,49 @@ mod tests {
 
         let (a, b) = futures::join!(inbound, outbound);
         a.and(b).unwrap();
+    }
+
+    #[test]
+    fn wildcard_listen_addresses() {
+        let mut ws_config =
+            WsConfig::new(tcp::TcpTransport::new(tcp::GenTcpConfig::default())).boxed();
+
+        let ws_proto1 = Protocol::Ws(std::borrow::Cow::Borrowed("1"));
+        let addr1 = Multiaddr::from(Ipv4Addr::UNSPECIFIED)
+            .with(Protocol::Tcp(0))
+            .with(ws_proto1.clone());
+        ws_config.listen_on(addr1).expect("listener");
+
+        let ws_proto2 = Protocol::Ws(std::borrow::Cow::Borrowed("2"));
+        let addr2 = Multiaddr::from(Ipv6Addr::UNSPECIFIED)
+            .with(Protocol::Tcp(0))
+            .with(ws_proto2.clone());
+        ws_config.listen_on(addr2).expect("listener");
+
+        let run = async {
+            let mut is_1_reported = false;
+            let mut is_2_reported = false;
+            while !is_1_reported || !is_2_reported {
+                let mut addr = ws_config
+                    .next()
+                    .await
+                    .expect("no error")
+                    .into_new_address()
+                    .expect("listen address");
+                let proto = addr.pop().unwrap();
+                match addr.iter().next() {
+                    Some(Protocol::Ip4(_)) => {
+                        assert_eq!(proto, ws_proto1);
+                        is_1_reported = true
+                    }
+                    Some(Protocol::Ip6(_)) => {
+                        assert_eq!(proto, ws_proto2);
+                        is_2_reported = true
+                    }
+                    _ => panic!("Invalid address"),
+                }
+            }
+        };
+        futures::executor::block_on(run)
     }
 }

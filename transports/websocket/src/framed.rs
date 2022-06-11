@@ -36,12 +36,7 @@ use soketto::{
     extension::deflate::Deflate,
     handshake,
 };
-use std::{
-    collections::{HashMap, VecDeque},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    ops::DerefMut,
-    sync::Arc,
-};
+use std::{cmp::Ordering, net::IpAddr, ops::DerefMut, sync::Arc};
 use std::{convert::TryInto, fmt, io, mem, pin::Pin, task::Context, task::Poll};
 use url::Url;
 
@@ -58,11 +53,7 @@ pub struct WsConfig<T> {
     tls_config: tls::Config,
     max_redirects: u8,
     use_deflate: bool,
-    /// Ws / Wss protocols extension for inner listening addresses, mapped to
-    /// the port of the listening address.
-    listener_protos: HashMap<u16, Protocol<'static>>,
-    wildcard_port_protos: HashMap<IpAddr, Protocol<'static>>,
-    wildcard_protos: VecDeque<Protocol<'static>>,
+    listen_addr_protos: ListenAddrsProtos,
 }
 
 impl<T> WsConfig<T> {
@@ -74,9 +65,7 @@ impl<T> WsConfig<T> {
             tls_config: tls::Config::client(),
             max_redirects: 0,
             use_deflate: false,
-            listener_protos: HashMap::new(),
-            wildcard_port_protos: HashMap::new(),
-            wildcard_protos: VecDeque::new(),
+            listen_addr_protos: ListenAddrsProtos(Vec::new()),
         }
     }
 
@@ -130,13 +119,10 @@ where
     type ListenerUpgrade = BoxFuture<'static, Result<Self::Output, Self::Error>>;
     type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
-        if !self.is_tcp_addr(&addr) {
-            debug!("{} is not a tcp multiaddr", addr);
-            return Err(TransportError::MultiaddrNotSupported(addr));
-        }
-        let mut inner_addr = addr.clone();
-        let proto = match inner_addr.pop() {
+    fn listen_on(&mut self, mut addr: Multiaddr) -> Result<(), TransportError<Self::Error>> {
+        let tcp_addr = TcpAddress::try_from(addr.clone())
+            .map_err(|_| TransportError::MultiaddrNotSupported(addr.clone()))?;
+        let proto = match addr.pop() {
             Some(p @ Protocol::Wss(_)) => {
                 if self.tls_config.server.is_none() {
                     debug!("/wss address but TLS server support is not configured");
@@ -152,14 +138,19 @@ where
         };
         self.transport
             .lock()
-            .listen_on(inner_addr.clone())
+            .listen_on(addr)
             .map_err(|e| e.map(Error::Transport))?;
-        self.insert_proto(inner_addr, proto);
+        self.listen_addr_protos.insert_proto(tcp_addr, proto);
         Ok(())
     }
 
     fn stop_listen_on(&mut self, addr: &Multiaddr) -> bool {
-        self.transport.lock().stop_listen_on(addr)
+        let mut addr = addr.clone();
+        match addr.pop() {
+            Some(Protocol::Ws(_)) | Some(Protocol::Wss(_)) => {}
+            _ => return false,
+        }
+        self.transport.lock().stop_listen_on(&addr)
     }
 
     fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
@@ -190,14 +181,16 @@ where
 
         let event = match inner_event {
             TransportEvent::NewAddress(mut addr) => {
-                let proto = self.get_proto(&addr);
-                addr.push(proto.clone());
+                if let Some(proto) = self.listen_addr_protos.get_proto(&addr) {
+                    addr.push(proto)
+                }
                 debug!("Listening on {}", addr);
-                TransportEvent::NewAddress(addr.clone())
+                TransportEvent::NewAddress(addr)
             }
             TransportEvent::AddressExpired(mut addr) => {
-                let proto = self.get_proto(&addr);
-                addr.push(proto.clone());
+                if let Some(proto) = self.listen_addr_protos.get_proto(&addr) {
+                    addr.push(proto)
+                }
                 TransportEvent::AddressExpired(addr)
             }
             TransportEvent::Error { error } => TransportEvent::Error {
@@ -212,14 +205,13 @@ where
                 mut local_addr,
                 mut send_back_addr,
             } => {
-                let proto = self.get_proto(&local_addr);
-                let use_tls = match proto {
-                    Protocol::Wss(_) => true,
-                    Protocol::Ws(_) => false,
-                    _ => unreachable!("Map contains only ws and wss protocols."),
+                let use_tls = if let Some(proto) = self.listen_addr_protos.get_proto(&local_addr) {
+                    local_addr.push(proto.clone());
+                    send_back_addr.push(proto.clone());
+                    matches!(proto, Protocol::Wss(_))
+                } else {
+                    false
                 };
-                local_addr.push(proto.clone());
-                send_back_addr.push(proto.clone());
                 let upgrade = self.map_upgrade(upgrade, send_back_addr.clone(), use_tls);
                 TransportEvent::Incoming {
                     upgrade,
@@ -287,74 +279,6 @@ where
         };
 
         Ok(Box::pin(future))
-    }
-
-    fn is_tcp_addr(&self, addr: &Multiaddr) -> bool {
-        let mut addr_iter = addr.iter();
-        matches!(
-            addr_iter.next(),
-            Some(Protocol::Ip4(_)) | Some(Protocol::Ip6(_))
-        ) && matches!(addr_iter.next(), Some(Protocol::Tcp(_)))
-            && match addr_iter.next() {
-                Some(Protocol::Wss(_)) if self.tls_config.server.is_none() => {
-                    debug!("/wss address but TLS server support is not configured");
-                    false
-                }
-                Some(Protocol::Wss(_)) | Some(Protocol::Ws(_)) => true,
-                _ => false,
-            }
-    }
-
-    fn insert_proto(&mut self, inner_addr: Multiaddr, proto: Protocol<'static>) {
-        let mut addr_iter = inner_addr.iter();
-        let ip_proto = addr_iter.next().expect("Address is valid.");
-        let port = match addr_iter.next().expect("Address is valid tcp address") {
-            Protocol::Tcp(port) => port,
-            _ => unreachable!("Address is valid tcp address."),
-        };
-        if port != 0 {
-            self.listener_protos.insert(port, proto);
-            return;
-        }
-        match ip_proto {
-            Protocol::Ip4(a) if a != Ipv4Addr::UNSPECIFIED => {
-                self.wildcard_port_protos.insert(a.into(), proto);
-            }
-            Protocol::Ip6(a) if a != Ipv6Addr::UNSPECIFIED => {
-                self.wildcard_port_protos.insert(a.into(), proto);
-            }
-            _ => {
-                // Wildcard address.
-                self.wildcard_protos.push_back(proto);
-            }
-        }
-    }
-
-    fn get_proto(&mut self, inner_address: &Multiaddr) -> Protocol<'static> {
-        let mut addr_iter = inner_address.iter();
-        let ip = addr_iter.next();
-        let port = match addr_iter.next() {
-            Some(Protocol::Tcp(p)) => {
-                if let Some(proto) = self.listener_protos.get(&p) {
-                    return proto.clone();
-                }
-                p
-            }
-            _ => unreachable!("Unsupported Address"),
-        };
-        // Fetch protocol if IP of the original IP address was **not** unspecified.
-        let proto = match ip {
-            Some(Protocol::Ip4(a)) => self.wildcard_port_protos.remove(&IpAddr::V4(a)),
-            Some(Protocol::Ip6(a)) => self.wildcard_port_protos.remove(&IpAddr::V6(a)),
-            _ => unreachable!("Address not supported"),
-        };
-        // Fetch protocol IP and Port of the original address were unspecified.
-        let proto = proto
-            .or_else(|| self.wildcard_protos.pop_front())
-            .expect("Address is supported");
-
-        self.listener_protos.insert(port, proto.clone());
-        proto
     }
 
     /// Attempts to dial the given address and perform a websocket handshake.
@@ -518,6 +442,117 @@ where
             Ok(conn)
         }
         .boxed()
+    }
+}
+
+/// List Ws / Wss protocols for inner TCP listening address.
+/// The (TcpAddress, Protocol)-tuple list is sorted so that non-wildcard tcp-
+/// addresses are listed before wildcard ones.
+#[derive(Debug)]
+struct ListenAddrsProtos(Vec<(TcpAddress, Protocol<'static>)>);
+
+impl ListenAddrsProtos {
+    /// Insert the ws/ wss protocol for an inner tcp address.
+    fn insert_proto(&mut self, tcp_addr: TcpAddress, proto: Protocol<'static>) {
+        self.0.push((tcp_addr, proto));
+        self.sort_listen_addr_protos();
+    }
+
+    /// Get the Ws/ WSS protocol for a Multiaddr of the inner tcp transport.
+    /// Return the protocol of the first [`TcpAddress`] that return `true` for
+    /// [`TcpAddress::matches_addr`]. Non-wildcard addresses are prioritized over
+    /// wildcard ones.
+    fn get_proto(&mut self, addr: &Multiaddr) -> Option<Protocol> {
+        let index = self.0.iter().position(|(a, _)| a.matches_addr(&addr))?;
+        let (tcp_addr, proto) = self.0.get_mut(index).unwrap();
+        let proto = proto.clone();
+        if tcp_addr.is_wildcard() {
+            // Update the address to the actual IP and port.
+            *tcp_addr = addr.clone().try_into().ok()?;
+            self.sort_listen_addr_protos();
+        }
+        Some(proto)
+    }
+
+    /// Sort list of `(Tcp, Protocol)`-pairs so that specified tcp-addresses are listed
+    /// before wildcard ones.
+    fn sort_listen_addr_protos(&mut self) {
+        self.0.sort_by(|(a, _), (b, _)| {
+            match (a.port, b.port) {
+                (1.., 0) => return Ordering::Less,
+                (0, 1..) => return Ordering::Greater,
+                _ => {}
+            }
+            match (a.ip, b.ip) {
+                (a, b) if !a.is_unspecified() && b.is_unspecified() => return Ordering::Less,
+                (a, b) if a.is_unspecified() && !b.is_unspecified() => return Ordering::Greater,
+                _ => {}
+            }
+            Ordering::Equal
+        });
+    }
+}
+
+/// Port and IP-Address of a TCP `Multiaddr`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TcpAddress {
+    ip: IpAddr,
+    port: u16,
+}
+
+impl TcpAddress {
+    /// Returns true if either the port or the IP-address is unspecified.
+    fn is_wildcard(&self) -> bool {
+        self.port == 0 || self.ip.is_unspecified()
+    }
+
+    /// Returns true IP-address and port of `self` are either unspecified
+    /// or match the IP and port of the given `Multiaddr`.
+    ///
+    /// Note: A TCP-listener can listen on multiple interfaces with the
+    /// same port. Thus we also return true for addresses with two different
+    /// non-wildcard IPs if the port matches.
+    fn matches_addr(&self, addr: &Multiaddr) -> bool {
+        let is_ip_matching = match addr.iter().next() {
+            Some(Protocol::Ip4(a)) => {
+                if !self.ip.is_ipv4() {
+                    return false;
+                }
+                a == self.ip || self.ip.is_unspecified()
+            }
+            Some(Protocol::Ip6(a)) => {
+                // TODO: Can listening on a wildcard IPv4 address create a Ipv6 listen address?
+                if !self.ip.is_ipv6() {
+                    return false;
+                }
+                a == self.ip || self.ip.is_unspecified()
+            }
+            _ => false,
+        };
+        let next = addr.iter().nth(1);
+        match next {
+            Some(Protocol::Tcp(p)) if p == self.port => true,
+            Some(Protocol::Tcp(_)) if self.port == 0 => is_ip_matching,
+            _ => false,
+        }
+    }
+}
+
+impl TryFrom<Multiaddr> for TcpAddress {
+    type Error = ();
+
+    fn try_from(addr: Multiaddr) -> Result<Self, Self::Error> {
+        let mut iter = addr.iter();
+        let ip = match iter.next() {
+            Some(Protocol::Ip4(a)) => a.into(),
+            Some(Protocol::Ip6(a)) => a.into(),
+            _ => return Err(()),
+        };
+        let port = match iter.next() {
+            Some(Protocol::Tcp(p)) => p,
+            _ => return Err(()),
+        };
+        Ok(TcpAddress { ip, port })
     }
 }
 
