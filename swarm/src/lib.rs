@@ -206,9 +206,9 @@ pub enum SwarmEvent<TBehaviourOutEvent, THandlerErr> {
         /// Endpoint of the connection that has been closed.
         endpoint: ConnectedPoint,
     },
-    /// Our transport has reported a new local listening address.
+    /// Our [`Transport`] has reported a new local listening address.
     NewListenAddr(Multiaddr),
-    /// Our transport has reported the expiration of a listening address.
+    /// Our [`Transport`] has reported the expiration of a listening address.
     ExpiredListenAddr(Multiaddr),
     /// [`Swarm::listen_on`] failed for the given address.
     ListenFailure {
