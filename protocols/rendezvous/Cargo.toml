@@ -37,6 +37,7 @@ libp2p-ping = { path = "../ping" }
 libp2p-identify = { path = "../identify" }
 libp2p-yamux = { path = "../../muxers/yamux" }
 libp2p-tcp = { path = "../../transports/tcp", features = ["tokio"] }
+libp2p-quic = { path = "../../transports/quic", features = ["tokio"] }
 rand = "0.8"
 tokio = { version = "1.15", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs", "net" ] }
 

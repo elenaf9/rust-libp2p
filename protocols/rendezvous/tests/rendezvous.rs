@@ -21,21 +21,25 @@
 #[macro_use]
 pub mod harness;
 
-use crate::harness::{await_event_or_timeout, await_events_or_timeout, new_swarm, SwarmExt};
+use crate::harness::{
+    await_event_or_timeout, await_events_or_timeout, new_swarm, new_swarm_with_transport, SwarmExt,
+};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use libp2p_core::identity;
+use libp2p_core::muxing::StreamMuxerBox;
+use libp2p_core::{identity, PeerId, Transport};
 use libp2p_rendezvous as rendezvous;
-use libp2p_swarm::{DialError, Swarm, SwarmEvent};
+use libp2p_swarm::{DialError, NetworkBehaviour, Swarm, SwarmEvent, AddressScore};
 use std::convert::TryInto;
+use std::fmt::Debug;
 use std::time::Duration;
 
-#[tokio::test]
-async fn given_successful_registration_then_successful_discovery() {
-    let _ = env_logger::try_init();
+async fn given_successful_registration_then_successful_discovery(
+    mut alice: Swarm<rendezvous::client::Behaviour>,
+    mut bob: Swarm<rendezvous::client::Behaviour>,
+    mut robert: Swarm<rendezvous::server::Behaviour>,
+) {
     let namespace = rendezvous::Namespace::from_static("some-namespace");
-    let ([mut alice, mut bob], mut robert) =
-        new_server_with_connected_clients(rendezvous::server::Config::default()).await;
 
     alice
         .behaviour_mut()
@@ -74,6 +78,54 @@ async fn given_successful_registration_then_successful_discovery() {
             }
         }
     };
+}
+
+#[tokio::test]
+async fn memory_given_successful_registration_then_successful_discovery() {
+    let _ = env_logger::try_init();
+    let ([alice, bob], robert) =
+        new_server_with_connected_clients(rendezvous::server::Config::default()).await;
+        given_successful_registration_then_successful_discovery(alice, bob, robert).await;
+}
+
+#[tokio::test]
+async fn quic_given_successful_registration_then_successful_discovery() {
+    let _ = env_logger::try_init();
+
+    async fn new_swarm_with_quic_transport<B, F>(f: F) -> Swarm<B>
+    where
+        B: NetworkBehaviour,
+        <B as NetworkBehaviour>::OutEvent: Debug,
+        F: FnOnce(PeerId, identity::Keypair) -> B,
+    {
+        let mut swarm = new_swarm_with_transport(f, |identity| {
+            libp2p_quic::tokio::Transport::new(libp2p_quic::Config::new(identity))
+                .map(|(peer_id, muxer), _| (peer_id, StreamMuxerBox::new(muxer)))
+                .boxed()
+        });
+
+        swarm
+            .listen_on("/ip4/127.0.0.1/udp/0/quic-v1".parse().unwrap())
+            .unwrap();
+        let addr = match swarm.select_next_some().await {
+            SwarmEvent::NewListenAddr { address, .. } => address,
+            ev => panic!("Unexpected event {ev:?}"),
+        };
+        swarm.add_external_address(addr, AddressScore::Infinite);
+        swarm
+    }
+
+    let alice =
+        new_swarm_with_quic_transport(|_, identity| rendezvous::client::Behaviour::new(identity))
+            .await;
+    let bob =
+        new_swarm_with_quic_transport(|_, identity| rendezvous::client::Behaviour::new(identity))
+            .await;
+    let robert = new_swarm_with_quic_transport(|_, _| {
+        rendezvous::server::Behaviour::new(rendezvous::server::Config::default())
+    })
+    .await;
+    given_successful_registration_then_successful_discovery(alice, bob, robert).await;
 }
 
 #[tokio::test]

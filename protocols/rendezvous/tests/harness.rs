@@ -22,8 +22,9 @@ use async_trait::async_trait;
 use futures::stream::FusedStream;
 use futures::StreamExt;
 use futures::{future, Stream};
+use libp2p_core::muxing::StreamMuxerBox;
 use libp2p_core::transport::upgrade::Version;
-use libp2p_core::transport::MemoryTransport;
+use libp2p_core::transport::{Boxed, MemoryTransport};
 use libp2p_core::upgrade::SelectUpgrade;
 use libp2p_core::{identity, Multiaddr, PeerId, Transport};
 use libp2p_mplex::MplexConfig;
@@ -37,23 +38,36 @@ pub fn new_swarm<B, F>(behaviour_fn: F) -> Swarm<B>
 where
     B: NetworkBehaviour,
     <B as NetworkBehaviour>::OutEvent: Debug,
-    B: NetworkBehaviour,
     F: FnOnce(PeerId, identity::Keypair) -> B,
+{
+    new_swarm_with_transport(behaviour_fn, |identity| {
+        MemoryTransport::default()
+            .upgrade(Version::V1)
+            .authenticate(NoiseAuthenticated::xx(identity).unwrap())
+            .multiplex(SelectUpgrade::new(
+                YamuxConfig::default(),
+                MplexConfig::new(),
+            ))
+            // .timeout(Duration::from_secs(5))
+            .boxed()
+    })
+}
+
+pub fn new_swarm_with_transport<B, F, G>(behaviour_fn: F, transport_fn: G) -> Swarm<B>
+where
+    B: NetworkBehaviour,
+    <B as NetworkBehaviour>::OutEvent: Debug,
+    F: FnOnce(PeerId, identity::Keypair) -> B,
+    G: FnOnce(&identity::Keypair) -> Boxed<(PeerId, StreamMuxerBox)>,
 {
     let identity = identity::Keypair::generate_ed25519();
     let peer_id = PeerId::from(identity.public());
 
-    let transport = MemoryTransport::default()
-        .upgrade(Version::V1)
-        .authenticate(NoiseAuthenticated::xx(&identity).unwrap())
-        .multiplex(SelectUpgrade::new(
-            YamuxConfig::default(),
-            MplexConfig::new(),
-        ))
-        .timeout(Duration::from_secs(5))
-        .boxed();
-
-    Swarm::with_tokio_executor(transport, behaviour_fn(peer_id, identity), peer_id)
+    Swarm::with_tokio_executor(
+        transport_fn(&identity),
+        behaviour_fn(peer_id, identity),
+        peer_id,
+    )
 }
 
 fn get_rand_memory_address() -> Multiaddr {
